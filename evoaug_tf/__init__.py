@@ -1,2 +1,2 @@
-import augment
-import evoaug_tf
+from . import augment
+from . import evoaug_tf
