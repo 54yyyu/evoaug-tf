@@ -112,11 +112,14 @@ class RobustModel(keras.Model):
             # apply augmentation combination to sequences
             ind = 0
             for augment in self.augment_list:
-                if tf.reduce_any(tf.equal(tf.constant(ind), aug_indices)):
-                    seq = augment(seq)      
-                    if hasattr(augment, 'insert_max'):
-                        insert_status = False
+                #if tf.reduce_any(tf.equal(tf.constant(ind), aug_indices)):
+                #    seq = augment(seq)
+                augment_condition = tf.reduce_any(tf.equal(tf.constant(ind), aug_indices))
+                seq = tf.cond(augment_condition, lambda: augment(seq), lambda: seq)      
+                if hasattr(augment, 'insert_max'):
+                    insert_status = False
                 ind += 1
+                
             if insert_status:
                 if self.insert_max:
                     seq = self._pad_end(seq)
