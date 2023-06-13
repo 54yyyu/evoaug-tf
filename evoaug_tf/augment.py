@@ -52,8 +52,8 @@ class RandomTranslocation(AugmentBase):
         Maximum size for random shift, defaults to 20.
     """
     def __init__(self, shift_min=0, shift_max=20):
-        self.shift_min = tf.constant(shift_min, dtype=tf.int32)
-        self.shift_max = tf.constant(shift_max, dtype=tf.int32)
+        self.shift_min = shift_min
+        self.shift_max = shift_max
     
     @tf.function
     def __call__(self, x):
