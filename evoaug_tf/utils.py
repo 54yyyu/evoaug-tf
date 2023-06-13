@@ -1,6 +1,7 @@
-import numpy
+import numpy as np
 import h5py
 import tensorflow as tf
+from scipy.stats import spearmanr, pearsonr
 
 
 def Spearman(y_true, y_pred):
