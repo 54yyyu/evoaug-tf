@@ -116,7 +116,7 @@ class RobustModel(keras.Model):
                 #    seq = augment(seq)
                 augment_condition = tf.reduce_any(tf.equal(tf.constant(ind), aug_indices))
                 seq = tf.cond(augment_condition, lambda: augment(seq), lambda: seq)      
-                if hasattr(augment, 'insert_max'):
+                if augment_condition and hasattr(augment, 'insert_max'):
                     insert_status = False
                 ind += 1
                 
