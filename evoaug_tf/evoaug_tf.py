@@ -58,7 +58,13 @@ class RobustModel(keras.Model):
         # Compute gradients
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
-        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+        if tf.distribute.get_replica_context():
+            # If in a distributed training context, apply gradients within the context
+            self.optimizer.get_gradients = lambda x: gradients
+            self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+        else:
+            self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+        #self.optimizer.apply_gradients(zip(gradients, trainable_vars))
         self.compiled_metrics.update_state(y, y_pred)
         return {m.name: m.result() for m in self.metrics}
 
