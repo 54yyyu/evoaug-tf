@@ -51,3 +51,65 @@ def DeepSTARR(input_shape):
     outputs = keras.layers.Dense(2, activation='linear')(x)
 
     return inputs, outputs
+
+
+
+params = {'kernel_size1': 7,
+          'kernel_size2': 3,
+          'kernel_size3': 5,
+          'kernel_size4': 3,
+          'num_filters': 256,
+          'num_filters2': 60,
+          'num_filters3': 60,
+          'num_filters4': 120,
+          'n_conv_layer': 4,
+          'n_add_layer': 2,
+          'dropout_prob': 0.4,
+          'dense_neurons1': 256,
+          'dense_neurons2': 256,
+          'pad':'same'}
+
+def DeepSTARR_ori(input_shape, params=params):
+    
+    lr = params['lr']
+    dropout_prob = params['dropout_prob']
+    n_conv_layer = params['n_conv_layer']
+    n_add_layer = params['n_add_layer']
+    
+    # body
+    inputs = tf.keras.Input(shape=input_shape)
+    x = keras.layers.Conv1D(params['num_filters'], kernel_size=params['kernel_size1'],
+                  padding=params['pad'],
+                  name='Conv1D_1st')(inputs)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation('relu')(x)
+    x = keras.layers.MaxPooling1D(2)(x)
+
+    for i in range(1, n_conv_layer):
+        x = keras.layers.Conv1D(params['num_filters'+str(i+1)],
+                      kernel_size=params['kernel_size'+str(i+1)],
+                      padding=params['pad'],
+                      name=str('Conv1D_'+str(i+1)))(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Activation('relu')(x)
+        x = keras.layers.MaxPooling1D(2)(x)
+    
+    x = keras.layers.Flatten()(x)
+    
+    # dense layers
+    for i in range(0, n_add_layer):
+        x = keras.layers.Dense(params['dense_neurons'+str(i+1)],
+                     name=str('Dense_'+str(i+1)))(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Activation('relu')(x)
+        x = keras.layers.Dropout(dropout_prob)(x)
+    
+    # heads per task (developmental and housekeeping enhancer activities)
+    """tasks = ['Dev', 'Hk']
+    outputs = []
+    for task in tasks:
+        outputs.append(keras.layers.Dense(1, activation='linear', name=str('Dense_' + task))(bottleneck))"""
+
+    outputs = keras.layers.Dense(2, activation='linear')(x)
+
+    return inputs, outputs
