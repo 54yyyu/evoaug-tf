@@ -70,8 +70,7 @@ params = {'kernel_size1': 7,
           'pad':'same'}
 
 def DeepSTARR_ori(input_shape, params=params):
-    
-    lr = params['lr']
+
     dropout_prob = params['dropout_prob']
     n_conv_layer = params['n_conv_layer']
     n_add_layer = params['n_add_layer']
@@ -105,11 +104,6 @@ def DeepSTARR_ori(input_shape, params=params):
         x = keras.layers.Dropout(dropout_prob)(x)
     
     # heads per task (developmental and housekeeping enhancer activities)
-    """tasks = ['Dev', 'Hk']
-    outputs = []
-    for task in tasks:
-        outputs.append(keras.layers.Dense(1, activation='linear', name=str('Dense_' + task))(bottleneck))"""
-
-    outputs = keras.layers.Dense(2, activation='linear')(x)
+    outputs = keras.layers.Dense(2, activation='linear')(x) #tasks = ['Dev', 'Hk']
 
     return inputs, outputs
