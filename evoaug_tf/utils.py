@@ -2,6 +2,7 @@ import h5py
 import numpy as np
 import tensorflow as tf
 from scipy.stats import spearmanr, pearsonr
+from scipy import stats
 
 
 def Spearman(y_true, y_pred):
@@ -26,6 +27,26 @@ def pearson_r(y_true, y_pred):
     correlation = tf.divide(covariance, tf.math.multiply(norm_true, norm_pred) + eps)
 
     return tf.reduce_mean(correlation)
+
+
+def evaluate_model(y_test, pred):
+    pearsonr = calculate_pearsonr(y_test, pred)
+    spearmanr = calculate_spearmanr(y_test, pred)
+    print("Test Pearson r : %.4f +/- %.4f"%(np.nanmean(pearsonr), np.nanstd(pearsonr)))
+    print("Test Spearman r: %.4f +/- %.4f"%(np.nanmean(spearmanr), np.nanstd(spearmanr)))
+    return pearsonr, spearmanr
+
+def calculate_pearsonr(y_true, y_score):
+    vals = []
+    for class_index in range(y_true.shape[-1]):
+        vals.append( stats.pearsonr(y_true[:,class_index], y_score[:,class_index])[0] )    
+    return np.array(vals)
+    
+def calculate_spearmanr(y_true, y_score):
+    vals = []
+    for class_index in range(y_true.shape[-1]):
+        vals.append( stats.spearmanr(y_true[:,class_index], y_score[:,class_index])[0] )    
+    return np.array(vals)
 
 
 def H5DataLoader(data_path, stage=None, lower_case=True, transpose=False, downsample=None):

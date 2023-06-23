@@ -17,7 +17,7 @@ params = {'kernel_size1': 7,
           'dense_neurons2': 256,
           'pad':'same'}
 
-def DeepSTARR_ori(input_shape, params=params):
+def DeepSTARR(input_shape, params=params):
 
     dropout_prob = params['dropout_prob']
     n_conv_layer = params['n_conv_layer']
