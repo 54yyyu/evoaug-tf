@@ -9,13 +9,13 @@ from tensorflow import keras
 from evoaug_tf import evoaug_tf, augment, model_zoo
 from evoaug_tf.utils import pearson_r, Spearman, H5DataLoader, evaluate_model
 
-group_name = "analysis"
+group_name = "analysis_v1"
 
 filepath = '../datasets/deepstarr_data.h5'
 x_train, y_train, x_valid, y_valid, x_test, y_test = H5DataLoader(filepath)
 _, L, A = x_valid.shape
 
-output_dir = 'result/'
+output_dir = 'result_v1/'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -55,7 +55,7 @@ for aug_index in range(len(augment_lists)):
         inputs, outputs = model_zoo.DeepSTARR(input_shape=(L+evoaug_tf.augment_max_len(augment_list),A))#, tasks=['Dev','Hk'])
         model = evoaug_tf.RobustModel(inputs=inputs, outputs=outputs, augment_list=augment_list, max_augs_per_seq=2, hard_aug=True)
 
-        model.compile(keras.optimizers.Adam(learning_rate=0.001, decay=1e-6), #weight_decay
+        model.compile(keras.optimizers.Adam(learning_rate=0.001, weight_decay=1e-6), #weight_decay
                     loss='mse', #  ['mse','mse']
                     #loss_weights=[1, 1], # loss weigths to balance
                     metrics=[Spearman, pearson_r]) # additional track metric
@@ -92,7 +92,7 @@ for aug_index in range(len(augment_lists)):
 
         model.load_weights(ckpt_path)
 
-        pred = model.predict(x_test, batch_size=512)
+        pred = model.predict(x_test, batch_size=64)
         aug_results = evaluate_model(y_test, pred)
 
         logs = {
@@ -105,8 +105,10 @@ for aug_index in range(len(augment_lists)):
 
         # ----------------- Fine Tune Analysis -----------------
 
-        finetune_optimizer = keras.optimizers.Adam(learning_rate=0.0001, decay=1e-6)
-        model.finetune_mode(optimizer=finetune_optimizer)
+        #finetune_optimizer = keras.optimizers.Adam(learning_rate=0.0001, weight_decay=1e-6)
+        model.optimizer.learning_rate = 1e-4
+        model.optimizer.weight_decay = 1e-6
+        model.finetune_mode() #optimizer=finetune_optimizer
 
         ckpt_path = os.path.join(output_dir, exp_name+"_finetune.h5")
         checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=ckpt_path,
@@ -125,7 +127,7 @@ for aug_index in range(len(augment_lists)):
 
         model.load_weights(ckpt_path)
 
-        pred = model.predict(x_test, batch_size=512)
+        pred = model.predict(x_test, batch_size=64)
         finetune_results = evaluate_model(y_test, pred)
 
         logs = {
