@@ -32,8 +32,10 @@ def pearson_r(y_true, y_pred):
 def evaluate_model(y_test, pred):
     pearsonr = calculate_pearsonr(y_test, pred)
     spearmanr = calculate_spearmanr(y_test, pred)
-    print("Test Pearson r : %.4f +/- %.4f"%(np.nanmean(pearsonr), np.nanstd(pearsonr)))
-    print("Test Spearman r: %.4f +/- %.4f"%(np.nanmean(spearmanr), np.nanstd(spearmanr)))
+    #print("Test Pearson r : %.4f +/- %.4f"%(np.nanmean(pearsonr), np.nanstd(pearsonr)))
+    #print("Test Spearman r: %.4f +/- %.4f"%(np.nanmean(spearmanr), np.nanstd(spearmanr)))
+    print("  Pearson r: %.4f \t %.4f"%(pearsonr[0], pearsonr[1]))
+    print("  Spearman : %.4f \t %.4f"%(spearmanr[0], spearmanr[1]))
     return pearsonr, spearmanr
 
 def calculate_pearsonr(y_true, y_score):
