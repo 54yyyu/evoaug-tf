@@ -26,8 +26,7 @@ class RobustModel(keras.Model):
     inference_aug : bool
         Flag to turn on augmentations during inference, default is False.
     """
-
-class RobustModel(keras.Model):
+    
     def __init__(self, model, augment_list=[], max_augs_per_seq=2, hard_aug=False, finetune=False, inference_aug=False, *args, **kwargs):
         super(RobustModel, self).__init__(*args, **kwargs)
         self.model = model
@@ -161,7 +160,7 @@ class RobustModel_in_out(keras.Model):
     """
 
     def __init__(self, augment_list=[], max_augs_per_seq=2, hard_aug=False, finetune=False, inference_aug=False, *args, **kwargs):
-        super(RobustModel, self).__init__(*args, **kwargs)
+        super(RobustModel_in_out, self).__init__(*args, **kwargs)
         self.augment_list = augment_list
         self.max_augs_per_seq = tf.math.minimum(max_augs_per_seq, len(augment_list))
         self.hard_aug = hard_aug
@@ -287,7 +286,7 @@ class RobustModel_per_seq(keras.Model):
     """
 
     def __init__(self, augment_list=[], max_augs_per_seq=2, hard_aug=False, finetune=False, inference_aug=False, *args, **kwargs):
-        super(RobustModel, self).__init__(*args, **kwargs)
+        super(RobustModel_per_seq, self).__init__(*args, **kwargs)
         self.augment_list = augment_list
         self.max_augs_per_seq = tf.math.minimum(max_augs_per_seq, len(augment_list))
         self.hard_aug = hard_aug
