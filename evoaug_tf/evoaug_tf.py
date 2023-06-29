@@ -7,6 +7,34 @@ import tensorflow as tf
 import tensorflow.keras as keras
 
 
+class Wrapper(tf.keras.Model):
+    def __init__(self, model_func, input_shape, augment_list=[], **kwargs):
+        super(Wrapper, self).__init__()
+        self.model_func = model_func
+        self.wrapper_input_shape = input_shape
+        self.augment_list = augment_list
+        self.kwargs = kwargs
+        self.build()
+    
+    def build(self, input_shape=None):
+        if input_shape is None:
+            input_shape = self.wrapper_input_shape
+        
+        # Add batch dimension to input shape
+        augmented_input_shape = [None] + list(input_shape)
+        # Extend sequence lengths based on augment_list
+        augmented_input_shape[1] += augment_max_len(self.augment_list)
+        
+        self.model = self.model_func(augmented_input_shape[1:], **self.kwargs)
+        self.model.build(augmented_input_shape)
+        
+        super(Wrapper, self).build(augmented_input_shape)
+    
+    @tf.function
+    def call(self, inputs, training=False):
+        return self.model(inputs, training=training)
+
+
 class RobustModel(keras.Model):
     """Tensorflow keras.Model to specify how augmentation should be applied to a model
 
@@ -27,9 +55,9 @@ class RobustModel(keras.Model):
         Flag to turn on augmentations during inference, default is False.
     """
     
-    def __init__(self, model, augment_list=[], max_augs_per_seq=2, hard_aug=False, finetune=False, inference_aug=False, *args, **kwargs):
-        super(RobustModel, self).__init__(*args, **kwargs)
-        self.model = model
+    def __init__(self, model, input_shape, augment_list=[], max_augs_per_seq=2, hard_aug=False, finetune=False, inference_aug=False, **kwargs):
+        super(RobustModel, self).__init__()
+        self.model = Wrapper(model, input_shape, augment_list, **kwargs)
         self.augment_list = augment_list
         self.max_augs_per_seq = tf.math.minimum(max_augs_per_seq, len(augment_list))
         self.hard_aug = hard_aug

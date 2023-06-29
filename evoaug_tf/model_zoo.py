@@ -2,6 +2,50 @@ import tensorflow as tf
 from tensorflow import keras
 
 
+def DeepSTARR(input_shape, output_shape=2):
+
+    # body
+    inputs = tf.keras.Input(shape=input_shape)
+    
+    x = keras.layers.Conv1D(256, kernel_size=7, padding='same', name='Conv1D_1st')(inputs)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation('relu')(x)
+    x = keras.layers.MaxPooling1D(2)(x)
+
+    x = keras.layers.Conv1D(60, kernel_size=3, padding='same', name=str('Conv1D_2'))(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation('relu')(x)
+    x = keras.layers.MaxPooling1D(2)(x)
+
+    x = keras.layers.Conv1D(60, kernel_size=5, padding='same', name=str('Conv1D_3'))(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation('relu')(x)
+    x = keras.layers.MaxPooling1D(2)(x)
+
+    x = keras.layers.Conv1D(120, kernel_size=3, padding='same', name=str('Conv1D_4'))(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation('relu')(x)
+    x = keras.layers.MaxPooling1D(2)(x)
+
+    x = keras.layers.Flatten()(x)
+    
+    # dense layers
+    x = keras.layers.Dense(256, name=str('Dense_1'))(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation('relu')(x)
+    x = keras.layers.Dropout(0.4)(x)
+    
+    x = keras.layers.Dense(256, name=str('Dense_2'))(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation('relu')(x)
+    x = keras.layers.Dropout(0.4)(x)
+    
+    # heads per task (developmental and housekeeping enhancer activities)
+    outputs = keras.layers.Dense(output_shape, activation='linear')(x) #tasks = ['Dev', 'Hk']
+
+    return tf.keras.Model(inputs=inputs, outputs=outputs)
+
+
 params = {'kernel_size1': 7,
           'kernel_size2': 3,
           'kernel_size3': 5,
@@ -17,7 +61,7 @@ params = {'kernel_size1': 7,
           'dense_neurons2': 256,
           'pad':'same'}
 
-def DeepSTARR(input_shape, params=params):
+def DeepSTARR_ori(input_shape, params=params):
 
     dropout_prob = params['dropout_prob']
     n_conv_layer = params['n_conv_layer']
@@ -56,8 +100,6 @@ def DeepSTARR(input_shape, params=params):
 
     #return inputs, outputs
     return tf.keras.Model(inputs=inputs, outputs=outputs)
-
-
 
 
 def DeepSTARR_v1(input_shape):
