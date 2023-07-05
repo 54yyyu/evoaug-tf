@@ -98,8 +98,7 @@ def DeepSTARR_ori(input_shape, params=params):
     # heads per task (developmental and housekeeping enhancer activities)
     outputs = keras.layers.Dense(2, activation='linear')(x) #tasks = ['Dev', 'Hk']
 
-    #return inputs, outputs
-    return tf.keras.Model(inputs=inputs, outputs=outputs)
+    return inputs, outputs
 
 
 def DeepSTARR_v1(input_shape):
