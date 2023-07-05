@@ -46,7 +46,7 @@ class RobustModel(keras.Model):
         # Add batch dimension to input shape2
         augmented_input_shape = [None] + list(input_shape)
         # Extend sequence lengths based on augment_list
-        augmented_input_shape[1] += evoaug_tf.augment_max_len(self.augment_list)
+        augmented_input_shape[1] += augment_max_len(self.augment_list)
 
         self.model = self.model(augmented_input_shape[1:], **self.kwargs)
 
@@ -316,7 +316,7 @@ class RobustModel_per_seq(keras.Model):
         # Add batch dimension to input shape2
         augmented_input_shape = [None] + list(input_shape)
         # Extend sequence lengths based on augment_list
-        augmented_input_shape[1] += evoaug_tf.augment_max_len(self.augment_list)
+        augmented_input_shape[1] += augment_max_len(self.augment_list)
 
         self.model = self.model(augmented_input_shape[1:], **self.kwargs)
 
