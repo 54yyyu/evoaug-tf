@@ -151,6 +151,12 @@ class RobustModel(keras.Model):
         self.finetune = True
         if optimizer is not None:
             self.optimizer = optimizer
+            
+    def save_weights(self, filepath):
+        self.model.save_weights(filepath)
+    
+    def load_weights(self, filepath):
+        self.model.load_weights(filepath)
 
 
 class RobustModel_in_out(keras.Model):
@@ -298,19 +304,19 @@ class RobustModel_per_seq(keras.Model):
     """
 
     def __init__(self, model_func, input_shape=None, augment_list=[], max_augs_per_seq=2, hard_aug=False, finetune=False, inference_aug=False, **kwargs):
-            super(RobustModel_per_seq, self).__init__()
-            self.model = model_func
-            self.augment_list = augment_list
-            self.max_augs_per_seq = tf.math.minimum(max_augs_per_seq, len(augment_list))
-            self.hard_aug = hard_aug
-            self.inference_aug = inference_aug
-            self.max_num_aug = len(augment_list)
-            self.insert_max = augment_max_len(augment_list)
-            self.finetune = finetune
-            self.kwargs = kwargs
-            
-            if input_shape is not None:
-                self.build_model(input_shape)
+        super(RobustModel_per_seq, self).__init__()
+        self.model = model_func
+        self.augment_list = augment_list
+        self.max_augs_per_seq = tf.math.minimum(max_augs_per_seq, len(augment_list))
+        self.hard_aug = hard_aug
+        self.inference_aug = inference_aug
+        self.max_num_aug = len(augment_list)
+        self.insert_max = augment_max_len(augment_list)
+        self.finetune = finetune
+        self.kwargs = kwargs
+        
+        if input_shape is not None:
+            self.build_model(input_shape)
 
     def build_model(self, input_shape):
         # Add batch dimension to input shape2
