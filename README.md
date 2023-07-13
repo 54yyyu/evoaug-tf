@@ -4,7 +4,7 @@ Evolution-inspired data augmentations for TensorFlow-based models for regulatory
 #### Install:
 
 ```
-pip install git+https://github.com/54yyyu/evoaug_tf.git
+pip install evoaug-tf
 ```
 
 
