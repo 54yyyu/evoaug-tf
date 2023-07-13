@@ -89,8 +89,8 @@ env/
 venv/
 ENV/
 
-# Analysis
-analysis/
+# Archive
+archive/
 
 # Spyder project settings
 .spyderproject
