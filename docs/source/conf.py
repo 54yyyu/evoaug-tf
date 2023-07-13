@@ -9,11 +9,13 @@
 project = 'EvoAug-TF'
 copyright = '2023, Yiyang Yu'
 author = 'Yiyang Yu'
-release = '0.1.0'
+
+release = '0.1'
+version = '0.1.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
-html_title = 'EvoAug-TF'
+#html_title = 'EvoAug-TF'
 
 extensions = [
     'sphinx.ext.duration',

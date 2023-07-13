@@ -6,7 +6,7 @@
 Welcome to EvoAug-TF's documentation!
 ===================================
 
-**EvoAu-TF** is a Python library to train TensorFlow
+**EvoAug-TF** is a Python library to train TensorFlow
 models on regulatory genomics data with evolution-inspired
 data augmentations.
 
