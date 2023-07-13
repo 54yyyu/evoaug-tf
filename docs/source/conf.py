@@ -5,6 +5,9 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+import sys
+
+sys.path.append("../")
 
 project = 'EvoAug-TF'
 copyright = '2023, Yiyang Yu'
@@ -37,7 +40,6 @@ intersphinx_mapping = {
 intersphinx_disabled_domains = ['std']
 
 templates_path = ['_templates']
-
 
 
 # -- Options for HTML output -------------------------------------------------
