@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import sys
 
-sys.path.append("../")
+sys.path.append("/home/yiyu/evoaug-tf/")
 
 project = 'EvoAug-TF'
 copyright = '2023, Yiyang Yu'
