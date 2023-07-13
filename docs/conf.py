@@ -25,7 +25,7 @@ extensions = [
 ]
 
 autoapi_type = 'python'
-autoapi_dirs = ['../evoaug-tf']
+autoapi_dirs = ['../evoaug_tf']
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
