@@ -1,4 +1,4 @@
-# EvoAug_tf
+# EvoAug-TF
 Evolution-inspired data augmentations for TensorFlow-based models for regulatory genomics
 
 #### Install:
