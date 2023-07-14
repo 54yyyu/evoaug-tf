@@ -3,7 +3,7 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 # Configuration file for the Sphinx documentation builder.
-project = 'evoaug-tf'
+project = 'EvoAug-TF'
 copyright = '2023, Yiyang Yu'
 author = 'Yiyang Yu'
 
@@ -29,7 +29,7 @@ autoapi_dirs = ['../evoaug_tf']
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
-    'tensorflow': ('https://www.tensorflow.org/api_docs', None),
+    'tensorflow': ('https://www.tensorflow.org/versions/r2.11/api_docs/', None),
 }
 intersphinx_disabled_domains = ['std']
 
