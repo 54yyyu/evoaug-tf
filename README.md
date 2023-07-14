@@ -1,5 +1,5 @@
 # EvoAug-TF
-Evolution-inspired data augmentations for TensorFlow-based models for regulatory genomics. For more information, see documentation on [evoaug-tf.readthedocs.io](https://evoaug-tf.readthedocs.io/en/latest/index.html).
+Evolution-inspired data augmentations for TensorFlow-based models for regulatory genomics. For more information, see documentation on [EvoAug-TF.ReadTheDocs.io](https://evoaug-tf.readthedocs.io/en/latest/index.html).
 
 #### Install:
 
