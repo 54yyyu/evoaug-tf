@@ -62,6 +62,9 @@ instance/
 # Scrapy stuff:
 .scrapy
 
+# Sphinx stuff:
+.readthedocs.yaml
+
 # Sphinx documentation
 docs/_build/
 docs/build/
