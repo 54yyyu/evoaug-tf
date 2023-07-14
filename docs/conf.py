@@ -2,14 +2,8 @@
 #
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-
-# -- Project information -----------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-import sys
-
-sys.path.append("/home/yiyu/evoaug-tf/")
-
-project = 'EvoAug-TF'
+# Configuration file for the Sphinx documentation builder.
+project = 'evoaug-tf'
 copyright = '2023, Yiyang Yu'
 author = 'Yiyang Yu'
 
@@ -31,7 +25,7 @@ extensions = [
 ]
 
 autoapi_type = 'python'
-autoapi_dirs = ['../../evoaug_tf']
+autoapi_dirs = ['../evoaug_tf']
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
@@ -40,7 +34,9 @@ intersphinx_mapping = {
 intersphinx_disabled_domains = ['std']
 
 templates_path = ['_templates']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+#root_doc = 'indexs'
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
