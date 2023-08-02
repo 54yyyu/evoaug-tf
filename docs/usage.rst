@@ -35,18 +35,18 @@ Train model with augmentations:
 
 .. code-block:: python
 
+    input_shape = (L,A) #<-- DEFINE L, A and input_shape should be first arguments to model_func (eg. model = model_func(input_shape))
     augment_list = [
         augment.RandomDeletion(delete_min=0, delete_max=30),
         augment.RandomRC(rc_prob=0.5),
         augment.RandomInsertion(insert_min=0, insert_max=20),
-        augment.RandomDeletion(delete_min=0, delete_max=30),
         augment.RandomTranslocation(shift_min=0, shift_max=20),
         augment.RandomNoise(noise_mean=0, noise_std=0.3),
         augment.RandomMutation(mutate_frac=0.05)
     ]
 
 
-    model = evoaug.RobustModel(model_func, augment_list=augment_list, max_augs_per_seq=1, hard_aug=True)
+    model = evoaug.RobustModel(model_func, input_shape, augment_list=augment_list, max_augs_per_seq=1, hard_aug=True)
 
     model.compile(keras.optimizers.Adam(learning_rate=0.001, weight_decay=1e-6), #weight_decay
                 loss='mse',
