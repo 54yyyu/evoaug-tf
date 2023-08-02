@@ -31,7 +31,6 @@ augment_list = [
     augment.RandomDeletion(delete_min=0, delete_max=30),
     augment.RandomRC(rc_prob=0.5),
     augment.RandomInsertion(insert_min=0, insert_max=20),
-    augment.RandomDeletion(delete_min=0, delete_max=30),
     augment.RandomTranslocation(shift_min=0, shift_max=20),
     augment.RandomNoise(noise_mean=0, noise_std=0.3),
     augment.RandomMutation(mutate_frac=0.05)
