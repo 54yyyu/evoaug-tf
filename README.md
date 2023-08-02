@@ -26,7 +26,7 @@ from tensorflow import keras
 keras.backend.clear_session()
 
 model_func = "DEFINE KERAS MODEL"
-
+input_shape = (L,A) <-- DEFINE L, A and input_shape should be first arguments to model_func (eg. model = model_func(input_shape))
 augment_list = [
     augment.RandomDeletion(delete_min=0, delete_max=30),
     augment.RandomRC(rc_prob=0.5),
@@ -38,7 +38,7 @@ augment_list = [
 ]
 
 
-model = evoaug.RobustModel(model_func, augment_list=augment_list, max_augs_per_seq=1, hard_aug=True)
+model = evoaug.RobustModel(model_func, input_shape, augment_list=augment_list, max_augs_per_seq=1, hard_aug=True)
 
 model.compile(keras.optimizers.Adam(learning_rate=0.001, weight_decay=1e-6), #weight_decay
             loss='mse',

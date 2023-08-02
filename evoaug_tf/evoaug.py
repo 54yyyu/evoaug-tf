@@ -91,12 +91,9 @@ class RobustModel(keras.Model):
             if self.insert_max:
                 x = self._pad_end(x)
 
-        with tf.GradientTape() as tape:
-            y_pred = self(x, training=True)  
-            loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
-
+        y_pred = self(x, training=True)  
+        loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
         self.compiled_metrics.update_state(y, y_pred)
-
         return {m.name: m.result() for m in self.metrics}
 
     @tf.function
