@@ -46,14 +46,12 @@ class RandomTranslocation(AugmentBase):
 
     Parameters
     ----------
-    shift_min : int, optional
-        Minimum size for random shift, defaults to 0.
     shift_max : int, optional
         Maximum size for random shift, defaults to 20.
     """
-    def __init__(self, shift_min=0, shift_max=20):
-        self.shift_min = shift_min
+    def __init__(self, shift_max=20, batch_mode=True):
         self.shift_max = shift_max
+        self.batch_mode = batch_mode
     
     @tf.function
     def __call__(self, x):
@@ -71,17 +69,20 @@ class RandomTranslocation(AugmentBase):
         """
         N = tf.shape(x)[0]
 
-        # determine size of shifts for each sequence
-        shifts = tf.random.uniform(shape=[N,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)
-        #shifts = tf.random.uniform(shape=(N,), minval=self.shift_min, maxval=self.shift_max + 1, dtype=tf.int32)
+        if self.batch_mode:
+            shift = tf.random.uniform(shape=[1,], minval=-1*shift_max, maxval=shift_max, dtype=tf.int32)[0]
+            x_new = tf.roll(x, shift=shift, axis=1)
 
+        else:
+            # determine size of shifts for each sequence
+            shifts = tf.random.uniform(shape=[N,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)
 
-        # apply random shift to each sequence
-        x_rolled = tf.TensorArray(dtype=x.dtype, size=N, element_shape=x[0].shape)
-        body = lambda i, x_rolled: (i + 1, x_rolled.write(i, tf.roll(x[i], shift=shifts[i], axis=0)))
-        cond = lambda i, x_rolled: i < tf.shape(shifts)[0]
-        _, x_rolled = tf.while_loop(cond, body, [0, x_rolled])
-        x_new = x_rolled.stack()
+            # apply random shift to each sequence
+            x_rolled = tf.TensorArray(dtype=x.dtype, size=N, element_shape=x[0].shape)
+            body = lambda i, x_rolled: (i + 1, x_rolled.write(i, tf.roll(x[i], shift=shifts[i], axis=0)))
+            cond = lambda i, x_rolled: i < tf.shape(shifts)[0]
+            _, x_rolled = tf.while_loop(cond, body, [0, x_rolled])
+            x_new = x_rolled.stack()
 
         return x_new
 

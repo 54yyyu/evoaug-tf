@@ -37,18 +37,19 @@ class RobustModel(keras.Model):
         self.max_num_aug = len(augment_list)
         self.insert_max = augment_max_len(augment_list)
         self.finetune = finetune
+        self.input_shape = input_shape
         self.kwargs = kwargs
         
-        if input_shape is not None:
+        if input_shape is not None:  # what is going on here????
             self.build_model(input_shape)
 
-    def build_model(self, input_shape):
+    def build_model(self):
         # Add batch dimension to input shape2
-        augmented_input_shape = [None] + list(input_shape)
+        augmented_input_shape = list(self.input_shape)
         # Extend sequence lengths based on augment_list
-        augmented_input_shape[1] += augment_max_len(self.augment_list)
+        augmented_input_shape[0] += self.insert_max
 
-        self.model = self.model(augmented_input_shape[1:], **self.kwargs)
+        self.model = self.model(augmented_input_shape, **self.kwargs)
 
     @tf.function
     def call(self, inputs, training=False):
@@ -73,7 +74,7 @@ class RobustModel(keras.Model):
 
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)
-            loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+            loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)  # look this up????
 
         # Compute gradients
         trainable_vars = self.trainable_variables
@@ -91,9 +92,9 @@ class RobustModel(keras.Model):
             if self.insert_max:
                 x = self._pad_end(x)
 
-        y_pred = self(x, training=True)  
+        y_pred = self(x, training=False)  
         loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
-        self.compiled_metrics.update_state(y, y_pred)
+        self.compiled_metrics.update_state(y, y_pred)   # look this up????
         return {m.name: m.result() for m in self.metrics}
 
     @tf.function
@@ -104,7 +105,7 @@ class RobustModel(keras.Model):
         else:
             if self.insert_max:
                 x = self._pad_end(x)
-        return self(x)
+        return self(x, training=False)
 
     @tf.function
     def _apply_augment(self, x):
@@ -131,12 +132,11 @@ class RobustModel(keras.Model):
                 x = self._pad_end(x)
         return x
     
-    def _pad_end(self, x):
+    def _pad_end(self, x, p=0.25):
         """Add random DNA padding of length insert_max to the end of each sequence in batch."""
         N = tf.shape(x)[0]
         L = tf.shape(x)[1]
         A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
-
         a = tf.eye(A)
         p = tf.ones((A,)) / A
         padding = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
@@ -179,3 +179,10 @@ def augment_max_len(augment_list):
         if hasattr(augment, 'insert_max'):
             insert_max = augment.insert_max
     return insert_max
+
+
+
+
+
+
+
