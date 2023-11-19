@@ -42,7 +42,7 @@ class RobustModel(keras.Model):
         if input_shape is not None:  # what is going on here????
             self.build_model(input_shape)
 
-    def build_model(self):
+    def build_model(self, input_shape):
 
         # Add batch dimension to input shape2
         augmented_input_shape = list(input_shape)
