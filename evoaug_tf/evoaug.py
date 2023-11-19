@@ -153,8 +153,7 @@ class RobustModel(keras.Model):
             
 
     def save_weights(self, filepath):
-        self.model.save_weights(filepath, overwrite=True)
-    
+        self.model.save_weights(filepath
 
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
