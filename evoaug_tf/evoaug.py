@@ -37,7 +37,6 @@ class RobustModel(keras.Model):
         self.max_num_aug = len(augment_list)
         self.insert_max = augment_max_len(augment_list)
         self.finetune = finetune
-        self.input_shape = input_shape
         self.kwargs = kwargs
         
         if input_shape is not None:  # what is going on here????
@@ -46,7 +45,7 @@ class RobustModel(keras.Model):
     def build_model(self):
 
         # Add batch dimension to input shape2
-        augmented_input_shape = list(self.input_shape)
+        augmented_input_shape = list(input_shape)
 
         # Extend sequence lengths based on augment_list
         augmented_input_shape[0] += self.insert_max
