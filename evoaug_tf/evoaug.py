@@ -44,8 +44,10 @@ class RobustModel(keras.Model):
             self.build_model(input_shape)
 
     def build_model(self):
+
         # Add batch dimension to input shape2
         augmented_input_shape = list(self.input_shape)
+
         # Extend sequence lengths based on augment_list
         augmented_input_shape[0] += self.insert_max
 
@@ -56,6 +58,7 @@ class RobustModel(keras.Model):
         y_hat = self.model(inputs, training=training)
         return y_hat
     
+
     @tf.function
     def train_step(self, data):
         if len(data) == 3:
@@ -77,11 +80,11 @@ class RobustModel(keras.Model):
             loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)  # look this up????
 
         # Compute gradients
-        trainable_vars = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_vars)
-        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         self.compiled_metrics.update_state(y, y_pred)
         return {m.name: m.result() for m in self.metrics}
+
 
     @tf.function
     def test_step(self, batch):
@@ -97,6 +100,7 @@ class RobustModel(keras.Model):
         self.compiled_metrics.update_state(y, y_pred)   # look this up????
         return {m.name: m.result() for m in self.metrics}
 
+
     @tf.function
     def predict_step(self, batch):
         x = batch
@@ -107,9 +111,11 @@ class RobustModel(keras.Model):
                 x = self._pad_end(x)
         return self(x, training=False)
 
+
     @tf.function
     def _apply_augment(self, x):
         """Apply augmentations to each sequence in batch, x."""
+
         # number of augmentations per sequence
         if self.hard_aug:
             batch_num_aug = tf.constant(self.max_augs_per_seq, dtype=tf.int32)
@@ -118,6 +124,7 @@ class RobustModel(keras.Model):
 
         # randomly choose which subset of augmentations from augment_list
         aug_indices = tf.sort(tf.random.shuffle(tf.range(self.max_num_aug))[:batch_num_aug])
+        
         # apply augmentation combination to sequences
         insert_status = True
         ind = 0
@@ -132,26 +139,35 @@ class RobustModel(keras.Model):
                 x = self._pad_end(x)
         return x
     
-    def _pad_end(self, x, p=0.25):
+
+    def _pad_end(self, x):
         """Add random DNA padding of length insert_max to the end of each sequence in batch."""
+
         N = tf.shape(x)[0]
         L = tf.shape(x)[1]
         A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
-        a = tf.eye(A)
         p = tf.ones((A,)) / A
-        padding = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
-        x_padded = tf.concat([x, padding], axis=1)
+        padding = tf.transpose(tf.gather(tf.eye(A), tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
+
+        half = int(self.insert_max/2)
+        x_padded = tf.concat([padding[:,:half,:], x, padding[:,half:,:]], axis=1)
         return x_padded
 
-    def finetune_mode(self, optimizer=None):
+
+    def finetune_mode(self, optimizer=None, lr=None):
         """Turn on finetune flag -- no augmentations during training."""
+
         self.finetune = True
         if optimizer is not None:
             self.optimizer = optimizer
+        if lr is not None:
+            self.optimizer.learning_rate = lr
             
+
     def save_weights(self, filepath):
         self.model.save_weights(filepath)
     
+
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
 

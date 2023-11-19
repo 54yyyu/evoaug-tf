@@ -49,9 +49,9 @@ class RandomTranslocation(AugmentBase):
     shift_max : int, optional
         Maximum size for random shift, defaults to 20.
     """
-    def __init__(self, shift_max=20, batch_mode=True):
+    def __init__(self, shift_min=0, shift_max=20):
+        self.shift_min = shift_min
         self.shift_max = shift_max
-        self.batch_mode = batch_mode
     
     @tf.function
     def __call__(self, x):
@@ -69,20 +69,15 @@ class RandomTranslocation(AugmentBase):
         """
         N = tf.shape(x)[0]
 
-        if self.batch_mode:
-            shift = tf.random.uniform(shape=[1,], minval=-1*shift_max, maxval=shift_max, dtype=tf.int32)[0]
-            x_new = tf.roll(x, shift=shift, axis=1)
+        # determine size of shifts for each sequence
+        shifts = tf.random.uniform(shape=[N,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)
 
-        else:
-            # determine size of shifts for each sequence
-            shifts = tf.random.uniform(shape=[N,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)
-
-            # apply random shift to each sequence
-            x_rolled = tf.TensorArray(dtype=x.dtype, size=N, element_shape=x[0].shape)
-            body = lambda i, x_rolled: (i + 1, x_rolled.write(i, tf.roll(x[i], shift=shifts[i], axis=0)))
-            cond = lambda i, x_rolled: i < tf.shape(shifts)[0]
-            _, x_rolled = tf.while_loop(cond, body, [0, x_rolled])
-            x_new = x_rolled.stack()
+        # apply random shift to each sequence
+        x_rolled = tf.TensorArray(dtype=x.dtype, size=N, element_shape=x[0].shape)
+        body = lambda i, x_rolled: (i + 1, x_rolled.write(i, tf.roll(x[i], shift=shifts[i], axis=0)))
+        cond = lambda i, x_rolled: i < tf.shape(shifts)[0]
+        _, x_rolled = tf.while_loop(cond, body, [0, x_rolled])
+        x_new = x_rolled.stack()
 
         return x_new
 
@@ -118,7 +113,7 @@ class RandomMutation(AugmentBase):
         A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
 
         # determine the number of mutations per sequence
-        num_mutations = tf.cast(tf.round(tf.cast(self.mutate_frac / 0.75, dtype=tf.float32) * tf.cast(L, dtype=tf.float32)), dtype=tf.int32)
+        num_mutations = tf.cast(tf.math.ceil(self.mutate_frac/0.75 * tf.cast(L, dtype=tf.float32)), dtype=tf.int32)
 
         # randomly determine the indices to apply mutations
         mutation_inds = tf.slice(tf.argsort(tf.random.uniform(shape=(N, L)), axis=1), [0,0], [N,num_mutations])
@@ -128,16 +123,12 @@ class RandomMutation(AugmentBase):
         mutations = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log(tf.repeat([p], repeats=num_mutations, axis=0)), N)), perm=[1,0,2])
 
         x_aug = tf.TensorArray(x.dtype, size=N)
-
         i = tf.constant(0)
-
         while_condition = lambda i, _: tf.less(i, N)
-
         body = lambda i, x_aug: (
             i + 1, 
             x_aug.write(i, tf.tensor_scatter_nd_update(x[i], tf.expand_dims(mutation_inds[i], axis=1), mutations[i]))
         )
-
         _, x_aug = tf.while_loop(while_condition, body, loop_vars=[i, x_aug])
         x_rolled = x_aug.stack()
         return x_rolled
