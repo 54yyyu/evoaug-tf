@@ -101,17 +101,6 @@ class RobustModel(keras.Model):
 
 
     @tf.function
-    def predict_step(self, batch):
-        x = batch
-        if self.inference_aug:
-            x = self._apply_augment(x)
-        else:
-            if self.insert_max:
-                x = self._pad_end(x)
-        return self(x, training=False)
-
-
-    @tf.function
     def _apply_augment(self, x):
         """Apply augmentations to each sequence in batch, x."""
 
@@ -164,7 +153,7 @@ class RobustModel(keras.Model):
             
 
     def save_weights(self, filepath):
-        self.model.save_weights(filepath)
+        self.model.save_weights(filepath, overwrite=True)
     
 
     def load_weights(self, filepath):
