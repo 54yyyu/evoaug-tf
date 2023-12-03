@@ -42,15 +42,14 @@ class RobustModel(keras.Model):
         if input_shape is not None:  # what is going on here????
             self.build_model(input_shape)
 
+
     def build_model(self, input_shape):
 
-        # Add batch dimension to input shape2
-        augmented_input_shape = list(input_shape)
-
         # Extend sequence lengths based on augment_list
+        augmented_input_shape = list(input_shape)
         augmented_input_shape[0] += self.insert_max
+        self.model = self.model(input_shape, **self.kwargs)
 
-        self.model = self.model(augmented_input_shape, **self.kwargs)
 
     @tf.function
     def call(self, inputs, training=False):

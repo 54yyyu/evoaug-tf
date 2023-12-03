@@ -186,7 +186,6 @@ class RandomInsertion(AugmentBase):
         x_aug = tf.TensorArray(x.dtype, size=N)
     
         while_condition = lambda i, _: tf.less(i, N)
-
         body = lambda i, x_aug: (
             i + 1, 
             x_aug.write(i, tf.concat([insertions[i][:tf.math.floordiv((self.insert_max - insert_lens[i]), 2), :],                                                                                   # random dna padding
@@ -196,7 +195,6 @@ class RandomInsertion(AugmentBase):
                                                 insertions[i][tf.math.floordiv((self.insert_max - insert_lens[i]), 2)+insert_lens[i]:self.insert_max, :]],                                          # random dna padding
                                                 axis=0))
         )
-
 
         _, x_aug = tf.while_loop(while_condition, body, loop_vars=[i, x_aug])
         x_rolled = x_aug.stack()
@@ -253,7 +251,6 @@ class RandomDeletion(AugmentBase):
         i = tf.constant(0)
         x_aug = tf.TensorArray(x.dtype, size=N)
         while_condition = lambda i, _: tf.less(i, N)
-
         body = lambda i, x_aug: (
             i + 1, 
             x_aug.write(i, tf.concat([padding[i][:tf.math.floordiv(delete_lens[i], 2), :],                                                  # random dna padding
@@ -337,3 +334,157 @@ class RandomNoise(AugmentBase):
             Sequences with random noise. 
         """
         return x + tf.random.normal(shape=tf.shape(x), mean=self.noise_mean, stddev=self.noise_std)
+
+
+class RandomInsertionBatch(AugmentBase):
+    """Randomly inserts a contiguous stretch of nucleotides from sequences in a training 
+    batch according to a random number between a user-defined insert_min and insert_max. 
+    A different insertoins is applied to each sequence. Each sequence is padded with random 
+    DNA to ensure same shapes.
+
+    Parameters
+    ----------
+    insert_min : int, optional
+        Minimum size for random insertion, defaults to 0
+    insert_max : int, optional
+        Maximum size for random insertion, defaults to 20
+    """
+    def __init__(self, insert_min=0, insert_max=20):
+        self.insert_min = insert_min
+        self.insert_max = insert_max
+    
+    @tf.function
+    def __call__(self,x):
+        """Randomly inserts segments of random DNA to a set of DNA sequences. 
+
+        Parameters
+        ----------
+        x : tf.Tensor
+            Batch of one-hot sequences (shape: (N, L, A)).
+        
+        Returns
+        -------
+        tf.Tensor
+            Sequences with randomly inserts segments of random DNA. All sequences 
+            are padded with random DNA to ensure same shape. 
+        """
+        N = tf.shape(x)[0]
+        L = tf.shape(x)[1]
+        A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
+
+        # sample random DNA
+        a = tf.eye(A)
+        p = tf.ones((A,)) / A
+        insertions = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
+
+        # sample insertion length for each sequence
+        insert_len = tf.random.uniform((1,), minval=self.insert_min, maxval=self.insert_max + 1, dtype=tf.int32)
+
+        # sample locations to insertion for each sequence
+        insert_ind = tf.random.uniform((1,), minval=0, maxval=L, dtype=tf.int32)
+        start_buffer = tf.math.floordiv((self.insert_max - insert_len), 2)
+
+        x_aug = tf.concat([insertions[:,:start_buffer,:],                               # random dna padding                                                                            # random dna padding
+                           x[:,:insert_ind,:],                                                                                                                           # sequence up to insertoin start index
+                           insertions[:,start_buffer:start_buffer+insert_len,:],       # random insertion
+                           x[:,insert_ind:,:],                                                                                                                           # sequence after insertion end index
+                           insertions[:,start_buffer+insert_len:self.insert_max,:]],   # random dna padding
+                           axis=1)
+        return x_aug
+
+
+
+
+class RandomDeletionBatch(AugmentBase):
+    """Randomly deletes a contiguous stretch of nucleotides from sequences in a training 
+    batch according to a random number between a user-defined delete_min and delete_max. 
+    A different deletion is applied to each sequence. 
+
+    Parameters
+    ----------
+    delete_min : int, optional
+        Minimum size for random deletion (defaults to 0). 
+    delete_max : int, optional
+        Maximum size for random deletion (defaults to 20). 
+    """
+    def __init__(self, delete_min=0, delete_max=20):
+        self.delete_min = delete_min
+        self.delete_max = delete_max
+    
+    @tf.function
+    def __call__(self, x):
+        """Randomly delete segments in a set of one-hot DNA sequences. 
+
+        Parameters
+        ----------
+        x : tf.Tensor
+            Batch of one-hot sequences (shape: (N, L, A)).
+        
+        Returns
+        -------
+        tf.Tensor
+            Sequences with randomly deleted segments (padded to correcct shape
+            with random DNA)
+        """
+        N = tf.shape(x)[0]
+        L = tf.shape(x)[1]
+        A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
+
+        # sample random DNA
+        a = tf.eye(A)
+        p = tf.ones((A,)) / A
+        padding = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.delete_max), N)), perm=[1,0,2])
+
+        # sample deletion length for each sequence
+        delete_len = tf.random.uniform((1,), minval=self.delete_min, maxval=self.delete_max + 1, dtype=tf.int32)
+
+        # sample locations to delete for each sequence
+        delete_ind = tf.random.uniform((1,), minval=0, maxval=L - self.delete_max + 1, dtype=tf.int32)
+
+        buffer_start = tf.math.floordiv(delete_len, 2)
+        x_aug = tf.concat([padding[:,:buffer_start, :],   # random dna padding
+                        x[:,:delete_ind, :],              # sequence up to deletion start index
+                        x[:,delete_ind+delete_len:,:],    # sequence after deletion end index
+                        padding[:,self.delete_max-delete_len+buffer_start:,:]],  # random dna padding
+                        axis=0)
+        return x_aug
+
+
+
+
+class RandomTranslocationBatch(AugmentBase):
+    """Randomly cuts sequence in two pieces and shifts the order for each in a training 
+    batch. This is implemented with a roll trasnformation with a user-defined shift_min 
+    and shift_max. A different roll (positive or negative) is applied to each sequence. 
+    Each sequence is padded with random DNA to ensure same shapes.
+
+    Parameters
+    ----------
+    shift_max : int, optional
+        Maximum size for random shift, defaults to 20.
+    """
+    def __init__(self, shift_min=0, shift_max=20):
+        self.shift_min = shift_min
+        self.shift_max = shift_max
+    
+    @tf.function
+    def __call__(self, x):
+        """Randomly shifts sequences in a batch, x.
+
+        Parameters
+        ----------
+        x : tf.Tensor
+            Batch of one-hot sequences (shape: (N, L, A)).
+        
+        Returns
+        -------
+        tf.Tensor
+            Sequences with random translocations.
+        """
+        N = tf.shape(x)[0]
+
+        # determine size of shifts for each sequence
+        shift = tf.random.uniform(shape=[1,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)
+        x_aug = tf.roll(x, shift=shift, axis=1)
+        return x_aug
+
