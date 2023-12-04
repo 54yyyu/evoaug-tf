@@ -39,24 +39,22 @@ class RobustModel(keras.Model):
         self.finetune = finetune
         self.kwargs = kwargs
         
-        if input_shape is not None:  # what is going on here????
+        if input_shape is not None:
             self.build_model(input_shape)
 
-
     def build_model(self, input_shape):
-
+        # Add batch dimension to input shape2
+        augmented_input_shape = [None] + list(input_shape)
         # Extend sequence lengths based on augment_list
-        augmented_input_shape = list(input_shape)
-        augmented_input_shape[0] += self.insert_max
-        self.model = self.model(input_shape, **self.kwargs)
+        augmented_input_shape[1] += augment_max_len(self.augment_list)
 
+        self.model = self.model(augmented_input_shape[1:], **self.kwargs)
 
     @tf.function
     def call(self, inputs, training=False):
         y_hat = self.model(inputs, training=training)
         return y_hat
     
-
     @tf.function
     def train_step(self, data):
         if len(data) == 3:
@@ -75,14 +73,14 @@ class RobustModel(keras.Model):
 
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)
-            loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)  # look this up????
+            loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
 
         # Compute gradients
-        gradients = tape.gradient(loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
         self.compiled_metrics.update_state(y, y_pred)
         return {m.name: m.result() for m in self.metrics}
-
 
     @tf.function
     def test_step(self, batch):
@@ -95,14 +93,22 @@ class RobustModel(keras.Model):
 
         y_pred = self(x, training=False)  
         loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
-        self.compiled_metrics.update_state(y, y_pred)   # look this up????
+        self.compiled_metrics.update_state(y, y_pred)
         return {m.name: m.result() for m in self.metrics}
 
+    @tf.function
+    def predict_step(self, batch):
+        x = batch
+        if self.inference_aug:
+            x = self._apply_augment(x)
+        else:
+            if self.insert_max:
+                x = self._pad_end(x)
+        return self(x)
 
     @tf.function
     def _apply_augment(self, x):
         """Apply augmentations to each sequence in batch, x."""
-
         # number of augmentations per sequence
         if self.hard_aug:
             batch_num_aug = tf.constant(self.max_augs_per_seq, dtype=tf.int32)
@@ -111,7 +117,6 @@ class RobustModel(keras.Model):
 
         # randomly choose which subset of augmentations from augment_list
         aug_indices = tf.sort(tf.random.shuffle(tf.range(self.max_num_aug))[:batch_num_aug])
-        
         # apply augmentation combination to sequences
         insert_status = True
         ind = 0
@@ -151,9 +156,10 @@ class RobustModel(keras.Model):
             self.optimizer.learning_rate = lr
             
 
+
     def save_weights(self, filepath):
         self.model.save_weights(filepath)
-
+    
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
 
@@ -181,9 +187,6 @@ def augment_max_len(augment_list):
         if hasattr(augment, 'insert_max'):
             insert_max = augment.insert_max
     return insert_max
-
-
-
 
 
 
