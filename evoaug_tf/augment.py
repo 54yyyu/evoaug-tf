@@ -378,10 +378,10 @@ class RandomInsertionBatch(AugmentBase):
         insertions = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
 
         # sample insertion length for each sequence
-        insert_len = tf.random.uniform((1,), minval=self.insert_min, maxval=self.insert_max + 1, dtype=tf.int32)
+        insert_len = tf.random.uniform(shape=(1,), minval=self.insert_min, maxval=self.insert_max + 1, dtype=tf.int32)[0]
 
         # sample locations to insertion for each sequence
-        insert_ind = tf.random.uniform((1,), minval=0, maxval=L, dtype=tf.int32)
+        insert_ind = tf.random.uniform(shape=(1,), minval=0, maxval=L, dtype=tf.int32)[0]
         start_buffer = tf.math.floordiv((self.insert_max - insert_len), 2)
 
         x_aug = tf.concat([insertions[:,:start_buffer,:],                               # random dna padding                                                                            # random dna padding
@@ -436,10 +436,10 @@ class RandomDeletionBatch(AugmentBase):
         padding = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.delete_max), N)), perm=[1,0,2])
 
         # sample deletion length for each sequence
-        delete_len = tf.random.uniform((1,), minval=self.delete_min, maxval=self.delete_max + 1, dtype=tf.int32)
+        delete_len = tf.random.uniform(shape=(1,), minval=self.delete_min, maxval=self.delete_max + 1, dtype=tf.int32)[0]
 
         # sample locations to delete for each sequence
-        delete_ind = tf.random.uniform((1,), minval=0, maxval=L - self.delete_max + 1, dtype=tf.int32)
+        delete_ind = tf.random.uniform(shape=(1,), minval=0, maxval=L - self.delete_max + 1, dtype=tf.int32)[0]
 
         buffer_start = tf.math.floordiv(delete_len, 2)
         x_aug = tf.concat([padding[:,:buffer_start, :],   # random dna padding
@@ -484,7 +484,9 @@ class RandomTranslocationBatch(AugmentBase):
         N = tf.shape(x)[0]
 
         # determine size of shifts for each sequence
-        shift = tf.random.uniform(shape=[1,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)
+        shift = tf.random.uniform(shape=[1,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)[0]
         x_aug = tf.roll(x, shift=shift, axis=1)
         return x_aug
+
+
 
