@@ -91,7 +91,7 @@ class RobustModel(keras.Model):
             if self.insert_max:
                 x = self._pad_end(x)
 
-        y_pred = self(x, training=True)  
+        y_pred = self(x, training=False)  
         loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
         self.compiled_metrics.update_state(y, y_pred)
         return {m.name: m.result() for m in self.metrics}
@@ -131,24 +131,32 @@ class RobustModel(keras.Model):
                 x = self._pad_end(x)
         return x
     
+
     def _pad_end(self, x):
         """Add random DNA padding of length insert_max to the end of each sequence in batch."""
+
         N = tf.shape(x)[0]
         L = tf.shape(x)[1]
         A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
-
-        a = tf.eye(A)
         p = tf.ones((A,)) / A
-        padding = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
-        x_padded = tf.concat([x, padding], axis=1)
+        padding = tf.transpose(tf.gather(tf.eye(A), tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
+
+        half = int(self.insert_max/2)
+        x_padded = tf.concat([padding[:,:half,:], x, padding[:,half:,:]], axis=1)
         return x_padded
 
-    def finetune_mode(self, optimizer=None):
+
+    def finetune_mode(self, optimizer=None, lr=None):
         """Turn on finetune flag -- no augmentations during training."""
+
         self.finetune = True
         if optimizer is not None:
             self.optimizer = optimizer
+        if lr is not None:
+            self.optimizer.learning_rate = lr
             
+
+
     def save_weights(self, filepath):
         self.model.save_weights(filepath)
     
@@ -179,3 +187,7 @@ def augment_max_len(augment_list):
         if hasattr(augment, 'insert_max'):
             insert_max = augment.insert_max
     return insert_max
+
+
+
+
