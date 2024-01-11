@@ -7,8 +7,8 @@ project = 'EvoAug-TF'
 copyright = '2024, Yiyang Yu'
 author = 'Yiyang Yu'
 
-release = '1.0.2'
-version = '1.0.2'
+release = '1.0.3'
+version = '1.0.3'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
