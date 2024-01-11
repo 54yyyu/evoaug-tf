@@ -4,11 +4,11 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 # Configuration file for the Sphinx documentation builder.
 project = 'EvoAug-TF'
-copyright = '2023, Yiyang Yu'
+copyright = '2024, Yiyang Yu'
 author = 'Yiyang Yu'
 
-release = '0.1'
-version = '0.1.0'
+release = '1.0.2'
+version = '1.0.2'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
