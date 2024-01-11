@@ -286,11 +286,13 @@ class RandomRC(AugmentBase):
     rc_prob: float, optional
         Probability to apply a reverse-complement transformation, defaults to 0.5.
     """
+    
     def __init__(self, rc_prob=0.5):
         """Creates random reverse-complement object usable by Evoaug.
         """
         self.rc_prob = tf.constant(rc_prob)
-
+    
+    @tf.function
     def __call__(self, x):
         """ Randomly transforms sequences in a batch with a reverse-compleemnt transformation. 
 
@@ -304,12 +306,15 @@ class RandomRC(AugmentBase):
         tf.tensor
             Sequences with random reverse-complements applied.
         """
-        x_rc = tf.gather(x, [3, 2, 1, 0], axis=2)
-        x_rc = tf.reverse(x_rc, axis=[1])
-        apply = tf.random.uniform(shape=[]) > (1 - self.rc_prob)
-        x_new = tf.cond(apply, lambda: x_rc, lambda: x)
-        return x_new
+        # make a copy of the sequence
+        x_aug = tf.identity(x)
 
+        # randomly select sequences to apply rc transformation
+        ind_rc = tf.random.uniform(shape=[tf.shape(x)[0],]) < self.rc_prob
+
+        # apply reverse-compement transformation
+        x_new = tf.where(ind_rc[:, None, None], tf.reverse(x_aug, axis=[1,2]), x_aug)
+        return x_new
 
 
 
@@ -343,6 +348,11 @@ class RandomNoise(AugmentBase):
         """
         return x + tf.random.normal(shape=tf.shape(x), mean=self.noise_mean, stddev=self.noise_std)
 
+
+
+#-----------------------------------------------------------------------------
+# Batch mode augmentations
+#-----------------------------------------------------------------------------
 
 
 class RandomInsertionBatch(AugmentBase):
@@ -393,10 +403,10 @@ class RandomInsertionBatch(AugmentBase):
         insert_ind = tf.random.uniform(shape=(1,), minval=0, maxval=L, dtype=tf.int32)[0]
         start_buffer = tf.math.floordiv((self.insert_max - insert_len), 2)
 
-        x_aug = tf.concat([insertions[:,:start_buffer,:],                               # random dna padding                                                                            # random dna padding
-                           x[:,:insert_ind,:],                                                                                                                           # sequence up to insertoin start index
+        x_aug = tf.concat([insertions[:,:start_buffer,:],                               # random dna padding                                                                           
+                           x[:,:insert_ind,:],                                          # sequence up to insertoin start index
                            insertions[:,start_buffer:start_buffer+insert_len,:],       # random insertion
-                           x[:,insert_ind:,:],                                                                                                                           # sequence after insertion end index
+                           x[:,insert_ind:,:],                                         # sequence after insertion end index
                            insertions[:,start_buffer+insert_len:self.insert_max,:]],   # random dna padding
                            axis=1)
         return x_aug
@@ -499,6 +509,40 @@ class RandomTranslocationBatch(AugmentBase):
 
 
 
+
+class RandomRCBatch(AugmentBase):
+    """Randomly applies a reverse-complement transformation to each sequence in a training 
+    batch according to a user-defined probability, rc_prob. This is applied to each sequence 
+    independently.
+
+    Parameters
+    ----------
+    rc_prob: float, optional
+        Probability to apply a reverse-complement transformation, defaults to 0.5.
+    """
+    def __init__(self, rc_prob=0.5):
+        """Creates random reverse-complement object usable by Evoaug.
+        """
+        self.rc_prob = tf.constant(rc_prob)
+
+    def __call__(self, x):
+        """ Randomly transforms sequences in a batch with a reverse-compleemnt transformation. 
+
+        Parameters
+        ----------
+        x : tf.tensor
+            Batch of one-hot sequences (shape: (N, L, A))
+        
+        Returns
+        -------
+        tf.tensor
+            Sequences with random reverse-complements applied.
+        """
+        x_rc = tf.gather(x, [3, 2, 1, 0], axis=2)
+        x_rc = tf.reverse(x_rc, axis=[1])
+        apply = tf.random.uniform(shape=[]) > (1 - self.rc_prob)
+        x_new = tf.cond(apply, lambda: x_rc, lambda: x)
+        return x_new
 
 
 
