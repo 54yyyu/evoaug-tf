@@ -1,5 +1,5 @@
 # EvoAug-TF
-Evolution-inspired data augmentations for TensorFlow-based models for regulatory genomics. For more information, see documentation on [EvoAug-TF.ReadTheDocs.io](https://evoaug-tf.readthedocs.io/en/latest/index.html).
+Evolution-inspired data augmentations for TensorFlow-based models for regulatory genomics ([paper](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-023-02941-w)). For more information, see documentation on [EvoAug-TF.ReadTheDocs.io](https://evoaug-tf.readthedocs.io/en/latest/index.html). 
 
 #### Install:
 
@@ -58,9 +58,6 @@ reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
                                                 mode='min',
                                                 verbose=1)
 
-save_path = os.path.join(output_dir, exp_name+"_aug.h5")
-
-
 # pre-train model with augmentations
 model.fit(x_train, y_train,
                 epochs=100,
@@ -69,6 +66,7 @@ model.fit(x_train, y_train,
                 validation_data=(x_valid, y_valid),
                 callbacks=[es_callback, reduce_lr])
 
+save_path = os.path.join(output_dir, exp_name+"_aug.h5")
 model.save_weights(save_path)
 
 # set up fine-tuning
@@ -83,9 +81,6 @@ es_callback = keras.callbacks.EarlyStopping(monitor='test_pearson_r (Dev)',
                                             mode='max',
                                             restore_best_weights=True)
 
-
-save_path = os.path.join(output_dir, exp_name+"_finetune.h5")
-
 # train model
 model.fit(x_train, y_train,
                 epochs=finetune_epochs,
@@ -94,11 +89,15 @@ model.fit(x_train, y_train,
                 validation_data=(x_valid, y_valid),
                 callbacks=[es_callback])
 
+save_path = os.path.join(output_dir, exp_name+"_finetune.h5")
 model.save_weights(save_path)
 ```
 
 #### Example on Google Colab:
 
-- Example analysis: https://colab.research.google.com/drive/1sCYAL133F1PPbn7aGOxeQTFW-6fpLo4r?usp=sharing
-- Example Ray Tune with Population Based Training: https://colab.research.google.com/drive/1NG8DrELTdmZPOw0RmaeNky0DZ5m2jpXY?usp=sharing
-- Example Ray Tune with Asynchronous Hyperband Algorithm: https://colab.research.google.com/drive/1mzKeXKSfkEfe9o-P-MhqQokLoW7Dv-Jk?usp=sharing
+- Example DeepSTARR analysis: https://colab.research.google.com/drive/11TA02v-azuqAIV5s3sCbWTH-C5W7_KMA 
+- Example ChIP-seq analysis: https://colab.research.google.com/drive/1fzpH2Qv8RFNzMvIDRJUGnUTaacFMIJBV
+
+#### Original EvoAug in PyTorch:
+- Paper: https://genomebiology.biomedcentral.com/articles/10.1186/s13059-023-02941-w 
+- Example DeepSTARR analysis: https://colab.research.google.com/drive/1a2fiRPBd1xvoJf0WNiMUgTYiLTs1XETf
