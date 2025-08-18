@@ -195,13 +195,21 @@ class RandomInsertion(AugmentBase):
     
         while_condition = lambda i, _: tf.less(i, N)
 
-        body = lambda i, x_aug: (
-            i + 1, 
-            x_aug.write(i, tf.concat([x[i][:insert_inds[i], :],                                           # original sequence up to insertion point
-                                     insertions[i][:insert_lens[i], :],                                  # random DNA insertion
-                                     x[i][insert_inds[i]:L-insert_lens[i], :]],                         # original sequence after insertion (trimmed to maintain length)
-                                     axis=0))
-        )
+        def insert_sequence(i, x_aug):
+            insert_len = insert_lens[i]
+            insert_ind = insert_inds[i]
+            
+            # Build the sequence: [before] + [insertion] + [after_trimmed]
+            before = x[i][:insert_ind, :]                           # Original sequence up to insertion point
+            insertion = insertions[i][:insert_len, :]               # Random DNA insertion
+            after = x[i][insert_ind:L-insert_len, :]               # Original sequence after insertion, trimmed to maintain length L
+            
+            # Concatenate - this should always result in exactly length L
+            result = tf.concat([before, insertion, after], axis=0)
+            
+            return i + 1, x_aug.write(i, result)
+        
+        body = insert_sequence
 
         _, x_aug = tf.while_loop(while_condition, body, loop_vars=[i, x_aug])
         x_rolled = x_aug.stack()
@@ -399,10 +407,13 @@ class RandomInsertionBatch(AugmentBase):
         # sample locations for insertion (same for all sequences in batch)
         insert_ind = tf.random.uniform(shape=(1,), minval=0, maxval=L, dtype=tf.int32)[0]
 
-        x_aug = tf.concat([x[:, :insert_ind, :],                                        # original sequence up to insertion point
-                          insertions[:, :insert_len, :],                               # random DNA insertion
-                          x[:, insert_ind:L-insert_len, :]],                          # original sequence after insertion (trimmed to maintain length)
-                          axis=1)
+        # Build the sequence: [before] + [insertion] + [after_trimmed]
+        before = x[:, :insert_ind, :]                               # Original sequence up to insertion point
+        insertion = insertions[:, :insert_len, :]                   # Random DNA insertion  
+        after = x[:, insert_ind:L-insert_len, :]                   # Original sequence after insertion, trimmed to maintain length L
+        
+        # Concatenate - this should always result in exactly length L
+        x_aug = tf.concat([before, insertion, after], axis=1)
         return x_aug
 
 
