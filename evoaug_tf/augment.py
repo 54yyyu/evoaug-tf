@@ -183,10 +183,12 @@ class RandomInsertion(AugmentBase):
         p = tf.ones((A,)) / A
         insertions = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
 
-        # sample insertion length for each sequence
-        insert_lens = tf.random.uniform((N,), minval=self.insert_min, maxval=self.insert_max + 1, dtype=tf.int32)
+        # sample insertion length for each sequence (clamp to max possible)
+        max_possible_insert = tf.minimum(self.insert_max, L - 1)
+        effective_min = tf.minimum(self.insert_min, max_possible_insert)
+        insert_lens = tf.random.uniform((N,), minval=effective_min, maxval=max_possible_insert + 1, dtype=tf.int32)
 
-        # sample locations for insertion for each sequence (ensure we don't go past the end when trimming)
+        # sample locations for insertion for each sequence
         insert_inds = tf.random.uniform((N,), minval=0, maxval=L, dtype=tf.int32)
 
         # loop over each sequence
@@ -198,6 +200,10 @@ class RandomInsertion(AugmentBase):
         def insert_sequence(i, x_aug):
             insert_len = insert_lens[i]
             insert_ind = insert_inds[i]
+            
+            # Ensure insert_ind + insert_len <= L by clamping insert_ind if necessary
+            max_valid_ind = L - insert_len
+            insert_ind = tf.minimum(insert_ind, max_valid_ind)
             
             # Build the sequence: [before] + [insertion] + [after_trimmed]
             before = x[i][:insert_ind, :]                           # Original sequence up to insertion point
@@ -401,11 +407,17 @@ class RandomInsertionBatch(AugmentBase):
         p = tf.ones((A,)) / A
         insertions = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
 
-        # sample insertion length (same for all sequences in batch)
-        insert_len = tf.random.uniform(shape=(1,), minval=self.insert_min, maxval=self.insert_max + 1, dtype=tf.int32)[0]
+        # sample insertion length (same for all sequences in batch, clamp to max possible)
+        max_possible_insert = tf.minimum(self.insert_max, L - 1)
+        effective_min = tf.minimum(self.insert_min, max_possible_insert)
+        insert_len = tf.random.uniform(shape=(1,), minval=effective_min, maxval=max_possible_insert + 1, dtype=tf.int32)[0]
 
         # sample locations for insertion (same for all sequences in batch)
         insert_ind = tf.random.uniform(shape=(1,), minval=0, maxval=L, dtype=tf.int32)[0]
+        
+        # Ensure insert_ind + insert_len <= L by clamping insert_ind if necessary
+        max_valid_ind = L - insert_len
+        insert_ind = tf.minimum(insert_ind, max_valid_ind)
 
         # Build the sequence: [before] + [insertion] + [after_trimmed]
         before = x[:, :insert_ind, :]                               # Original sequence up to insertion point
