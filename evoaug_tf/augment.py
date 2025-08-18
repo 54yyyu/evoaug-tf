@@ -143,10 +143,10 @@ class RandomMutation(AugmentBase):
 
 
 class RandomInsertion(AugmentBase):
-    """Randomly inserts a contiguous stretch of nucleotides from sequences in a training 
+    """Randomly inserts a contiguous stretch of nucleotides into sequences in a training 
     batch according to a random number between a user-defined insert_min and insert_max. 
-    A different insertoins is applied to each sequence. Each sequence is padded with random 
-    DNA to ensure same shapes.
+    The sequence length is maintained by trimming the end of the sequence after insertion.
+    A different insertion is applied to each sequence.
 
     Parameters
     ----------
@@ -160,8 +160,8 @@ class RandomInsertion(AugmentBase):
         self.insert_max = insert_max
     
     @tf.function
-    def __call__(self,x):
-        """Randomly inserts segments of random DNA to a set of DNA sequences. 
+    def __call__(self, x):
+        """Randomly inserts segments of random DNA into sequences while maintaining length.
 
         Parameters
         ----------
@@ -171,14 +171,14 @@ class RandomInsertion(AugmentBase):
         Returns
         -------
         tf.Tensor
-            Sequences with randomly inserts segments of random DNA. All sequences 
-            are padded with random DNA to ensure same shape. 
+            Sequences with randomly inserted segments of random DNA. Original sequence 
+            length is maintained by trimming the end.
         """
         N = tf.shape(x)[0]
         L = tf.shape(x)[1]
-        A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
+        A = tf.cast(tf.shape(x)[2], dtype=tf.float32)
 
-        # sample random DNA
+        # sample random DNA for insertions
         a = tf.eye(A)
         p = tf.ones((A,)) / A
         insertions = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
@@ -186,7 +186,7 @@ class RandomInsertion(AugmentBase):
         # sample insertion length for each sequence
         insert_lens = tf.random.uniform((N,), minval=self.insert_min, maxval=self.insert_max + 1, dtype=tf.int32)
 
-        # sample locations to insertion for each sequence
+        # sample locations for insertion for each sequence (ensure we don't go past the end when trimming)
         insert_inds = tf.random.uniform((N,), minval=0, maxval=L, dtype=tf.int32)
 
         # loop over each sequence
@@ -197,14 +197,11 @@ class RandomInsertion(AugmentBase):
 
         body = lambda i, x_aug: (
             i + 1, 
-            x_aug.write(i, tf.concat([insertions[i][:tf.math.floordiv((self.insert_max - insert_lens[i]), 2), :],                                                                                   # random dna padding
-                                                x[i][:insert_inds[i], :],                                                                                                                           # sequence up to insertoin start index
-                                                insertions[i][tf.math.floordiv((self.insert_max - insert_lens[i]), 2):tf.math.floordiv((self.insert_max - insert_lens[i]), 2)+insert_lens[i], :],   # random insertion
-                                                x[i][insert_inds[i]:, :],                                                                                                                           # sequence after insertion end index
-                                                insertions[i][tf.math.floordiv((self.insert_max - insert_lens[i]), 2)+insert_lens[i]:self.insert_max, :]],                                          # random dna padding
-                                                axis=0))
+            x_aug.write(i, tf.concat([x[i][:insert_inds[i], :],                                           # original sequence up to insertion point
+                                     insertions[i][:insert_lens[i], :],                                  # random DNA insertion
+                                     x[i][insert_inds[i]:L-insert_lens[i], :]],                         # original sequence after insertion (trimmed to maintain length)
+                                     axis=0))
         )
-
 
         _, x_aug = tf.while_loop(while_condition, body, loop_vars=[i, x_aug])
         x_rolled = x_aug.stack()
@@ -356,10 +353,10 @@ class RandomNoise(AugmentBase):
 
 
 class RandomInsertionBatch(AugmentBase):
-    """Randomly inserts a contiguous stretch of nucleotides from sequences in a training 
+    """Randomly inserts a contiguous stretch of nucleotides into sequences in a training 
     batch according to a random number between a user-defined insert_min and insert_max. 
-    A different insertoins is applied to each sequence. Each sequence is padded with random 
-    DNA to ensure same shapes.
+    The sequence length is maintained by trimming the end of the sequence after insertion.
+    The same insertion is applied to all sequences in the batch.
 
     Parameters
     ----------
@@ -373,8 +370,8 @@ class RandomInsertionBatch(AugmentBase):
         self.insert_max = insert_max
     
     @tf.function
-    def __call__(self,x):
-        """Randomly inserts segments of random DNA to a set of DNA sequences. 
+    def __call__(self, x):
+        """Randomly inserts segments of random DNA into sequences while maintaining length.
 
         Parameters
         ----------
@@ -384,31 +381,28 @@ class RandomInsertionBatch(AugmentBase):
         Returns
         -------
         tf.Tensor
-            Sequences with randomly inserts segments of random DNA. All sequences 
-            are padded with random DNA to ensure same shape. 
+            Sequences with randomly inserted segments of random DNA. Original sequence 
+            length is maintained by trimming the end.
         """
         N = tf.shape(x)[0]
         L = tf.shape(x)[1]
-        A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
+        A = tf.cast(tf.shape(x)[2], dtype=tf.float32)
 
-        # sample random DNA
+        # sample random DNA for insertions
         a = tf.eye(A)
         p = tf.ones((A,)) / A
         insertions = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
 
-        # sample insertion length for each sequence
+        # sample insertion length (same for all sequences in batch)
         insert_len = tf.random.uniform(shape=(1,), minval=self.insert_min, maxval=self.insert_max + 1, dtype=tf.int32)[0]
 
-        # sample locations to insertion for each sequence
+        # sample locations for insertion (same for all sequences in batch)
         insert_ind = tf.random.uniform(shape=(1,), minval=0, maxval=L, dtype=tf.int32)[0]
-        start_buffer = tf.math.floordiv((self.insert_max - insert_len), 2)
 
-        x_aug = tf.concat([insertions[:,:start_buffer,:],                               # random dna padding                                                                           
-                           x[:,:insert_ind,:],                                          # sequence up to insertoin start index
-                           insertions[:,start_buffer:start_buffer+insert_len,:],       # random insertion
-                           x[:,insert_ind:,:],                                         # sequence after insertion end index
-                           insertions[:,start_buffer+insert_len:self.insert_max,:]],   # random dna padding
-                           axis=1)
+        x_aug = tf.concat([x[:, :insert_ind, :],                                        # original sequence up to insertion point
+                          insertions[:, :insert_len, :],                               # random DNA insertion
+                          x[:, insert_ind:L-insert_len, :]],                          # original sequence after insertion (trimmed to maintain length)
+                          axis=1)
         return x_aug
 
 
@@ -500,8 +494,6 @@ class RandomTranslocationBatch(AugmentBase):
         tf.Tensor
             Sequences with random translocations.
         """
-        N = tf.shape(x)[0]
-
         # determine size of shifts for each sequence
         shift = tf.random.uniform(shape=[1,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)[0]
         x_aug = tf.roll(x, shift=shift, axis=1)
