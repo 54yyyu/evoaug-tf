@@ -178,54 +178,51 @@ class RandomInsertion(AugmentBase):
         L = tf.shape(x)[1]
         A = tf.cast(tf.shape(x)[2], dtype=tf.float32)
 
-        # sample random DNA for insertions
-        a = tf.eye(A)
-        p = tf.ones((A,)) / A
-        insertions = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
-
-        # sample insertion length for each sequence (clamp to max possible)
+        # Sample insertion length for each sequence (clamp to max possible)
         max_possible_insert = tf.minimum(self.insert_max, L - 1)
         effective_min = tf.minimum(self.insert_min, max_possible_insert)
         insert_lens = tf.random.uniform((N,), minval=effective_min, maxval=max_possible_insert + 1, dtype=tf.int32)
 
-        # sample locations for insertion for each sequence
+        # Sample locations for insertion for each sequence
         insert_inds = tf.random.uniform((N,), minval=0, maxval=L, dtype=tf.int32)
 
-        # loop over each sequence
+        # Generate random DNA for insertions
+        a = tf.eye(tf.cast(A, tf.int32))
+        p = tf.ones((tf.cast(A, tf.int32),)) / A
+        random_insertions = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.insert_max), N)), perm=[1,0,2])
+
+        # Loop over each sequence
         i = tf.constant(0)
         x_aug = tf.TensorArray(x.dtype, size=N)
-    
         while_condition = lambda i, _: tf.less(i, N)
 
         def insert_sequence(i, x_aug):
             insert_len = insert_lens[i]
             insert_ind = insert_inds[i]
             
-            # Ensure insert_ind + insert_len <= L by clamping insert_ind if necessary
-            max_valid_ind = L - insert_len
-            insert_ind = tf.minimum(insert_ind, max_valid_ind)
+            # Ensure we don't go past the end when trimming
+            trim_end = L - insert_len
+            insert_ind = tf.minimum(insert_ind, trim_end)
             
             # Build the sequence: [before] + [insertion] + [after_trimmed]
-            before = x[i][:insert_ind, :]                           # Original sequence up to insertion point
-            insertion = insertions[i][:insert_len, :]               # Random DNA insertion
-            after = x[i][insert_ind:L-insert_len, :]               # Original sequence after insertion, trimmed to maintain length L
+            before = x[i][:insert_ind, :]                                       # Original sequence up to insertion point
+            insertion = random_insertions[i][:insert_len, :]                    # Random DNA insertion
+            after = x[i][insert_ind:trim_end, :]                               # Original sequence after insertion, trimmed to maintain length
             
             # Concatenate - this should always result in exactly length L
             result = tf.concat([before, insertion, after], axis=0)
             
             return i + 1, x_aug.write(i, result)
-        
-        body = insert_sequence
 
-        _, x_aug = tf.while_loop(while_condition, body, loop_vars=[i, x_aug])
-        x_rolled = x_aug.stack()
-        return x_rolled
+        _, x_aug = tf.while_loop(while_condition, insert_sequence, loop_vars=[i, x_aug])
+        return x_aug.stack()
 
 
 class RandomDeletion(AugmentBase):
     """Randomly deletes a contiguous stretch of nucleotides from sequences in a training 
     batch according to a random number between a user-defined delete_min and delete_max. 
-    A different deletion is applied to each sequence. 
+    The sequence length is maintained by padding with random DNA. A different deletion 
+    is applied to each sequence.
 
     Parameters
     ----------
@@ -240,7 +237,7 @@ class RandomDeletion(AugmentBase):
     
     @tf.function
     def __call__(self, x):
-        """Randomly delete segments in a set of one-hot DNA sequences. 
+        """Randomly delete segments in a set of one-hot DNA sequences while maintaining length.
 
         Parameters
         ----------
@@ -250,39 +247,50 @@ class RandomDeletion(AugmentBase):
         Returns
         -------
         tf.Tensor
-            Sequences with randomly deleted segments (padded to correcct shape
-            with random DNA)
+            Sequences with randomly deleted segments, padded with random DNA to maintain 
+            original sequence length.
         """
         N = tf.shape(x)[0]
         L = tf.shape(x)[1]
-        A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
+        A = tf.cast(tf.shape(x)[2], dtype=tf.float32)
 
-        # sample random DNA
-        a = tf.eye(A)
-        p = tf.ones((A,)) / A
-        padding = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.delete_max), N)), perm=[1,0,2])
+        # Sample deletion length for each sequence (clamp to max possible)
+        max_possible_delete = tf.minimum(self.delete_max, L - 1)
+        effective_min = tf.minimum(self.delete_min, max_possible_delete)
+        delete_lens = tf.random.uniform((N,), minval=effective_min, maxval=max_possible_delete + 1, dtype=tf.int32)
 
-        # sample deletion length for each sequence
-        delete_lens = tf.random.uniform((N,), minval=self.delete_min, maxval=self.delete_max + 1, dtype=tf.int32)
+        # Sample locations to delete for each sequence
+        delete_inds = tf.random.uniform((N,), minval=0, maxval=L, dtype=tf.int32)
 
-        # sample locations to delete for each sequence
-        delete_inds = tf.random.uniform((N,), minval=0, maxval=L - self.delete_max + 1, dtype=tf.int32)
+        # Generate random DNA for padding
+        a = tf.eye(tf.cast(A, tf.int32))
+        p = tf.ones((tf.cast(A, tf.int32),)) / A
+        random_padding = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log([p] * self.delete_max), N)), perm=[1,0,2])
 
-        # loop over each sequence
+        # Loop over each sequence
         i = tf.constant(0)
         x_aug = tf.TensorArray(x.dtype, size=N)
         while_condition = lambda i, _: tf.less(i, N)
 
-        body = lambda i, x_aug: (
-            i + 1, 
-            x_aug.write(i, tf.concat([padding[i][:tf.math.floordiv(delete_lens[i], 2), :],                                                  # random dna padding
-                                                x[i][:delete_inds[i], :],                                                                   # sequence up to deletion start index
-                                                x[i][delete_inds[i]+delete_lens[i]:, :],                                                    # sequence after deletion end index
-                                                padding[i][self.delete_max-delete_lens[i]+tf.math.floordiv(delete_lens[i], 2):, :]],        # random dna padding
-                                                axis=0))                                                                                    # concatenation axis
-        )
+        def delete_sequence(i, x_aug):
+            delete_len = delete_lens[i]
+            delete_ind = delete_inds[i]
+            
+            # Ensure we don't delete past the end of the sequence
+            delete_end = tf.minimum(delete_ind + delete_len, L)
+            actual_delete_len = delete_end - delete_ind
+            
+            # Build the sequence: [before] + [after] + [padding]
+            before = x[i][:delete_ind, :]                                       # Original sequence before deletion
+            after = x[i][delete_end:, :]                                       # Original sequence after deletion
+            padding = random_padding[i][:actual_delete_len, :]                  # Random DNA padding to maintain length
+            
+            # Concatenate - this should always result in exactly length L
+            result = tf.concat([before, after, padding], axis=0)
+            
+            return i + 1, x_aug.write(i, result)
 
-        _, x_aug = tf.while_loop(while_condition, body, loop_vars=[i, x_aug])
+        _, x_aug = tf.while_loop(while_condition, delete_sequence, loop_vars=[i, x_aug])
         return x_aug.stack()
 
 
