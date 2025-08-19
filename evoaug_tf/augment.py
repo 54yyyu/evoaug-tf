@@ -123,7 +123,6 @@ class RandomMutation(AugmentBase):
 class RandomInsertion(AugmentBase):
     """Randomly inserts a contiguous stretch of nucleotides into sequences in a training 
     batch according to a random number between a user-defined insert_min and insert_max. 
-    The sequence length is maintained by trimming the end of the sequence after insertion.
     A different insertion is applied to each sequence.
 
     Parameters
@@ -149,52 +148,42 @@ class RandomInsertion(AugmentBase):
         Returns
         -------
         tf.Tensor
-            Sequences with randomly inserted segments of random DNA. Original sequence 
-            length is maintained by trimming the end.
+            Sequences with randomly inserted segments of random DNA.
         """
         N, L, A = tf.shape(x)[0], tf.shape(x)[1], tf.shape(x)[2]
 
-        insert_len = tf.random.uniform([], self.insert_min,
-                                       tf.minimum(self.insert_max, L // 2) + 1,
-                                       dtype=tf.int32)
+        # Determine insertion length with proper bounds checking
+        max_insert = tf.minimum(self.insert_max, L // 2)
+        
+        # Ensure minval < maxval for tf.random.uniform
+        effective_min = tf.minimum(self.insert_min, max_insert)
+        effective_max = tf.maximum(effective_min, max_insert)
+        
+        insert_len = tf.random.uniform([], effective_min, effective_max + 1, dtype=tf.int32)
 
         def do_insertion():
-            # Generate random DNA insertions for each sequence
-            new_idx = tf.random.uniform((N, insert_len), minval=0, maxval=A, dtype=tf.int32)
-            insertions = tf.one_hot(new_idx, A, dtype=x.dtype)
-
-            # Generate random insertion positions for each sequence
-            insert_inds = tf.random.uniform((N,), minval=0, maxval=L - insert_len + 1, dtype=tf.int32)
-
-            # Create output tensor
-            result = tf.zeros_like(x)
+            # Generate different insertion positions for each sequence
+            insert_starts = tf.random.uniform((N,), 0, L - insert_len + 1, dtype=tf.int32)
             
-            # Use tf.while_loop to process each sequence
-            def cond(i, result):
-                return i < N
+            # Generate random insertion DNA for all sequences
+            new_idx = tf.random.uniform((N, L), minval=0, maxval=A, dtype=tf.int32)
+            insertion = tf.one_hot(new_idx, A, dtype=x.dtype)
             
-            def body(i, result):
-                seq = x[i]
-                insertion = insertions[i]
-                insert_ind = insert_inds[i]
-                
-                # Use tf.cond to handle the slicing
-                def insert_at_position():
-                    before = seq[:insert_ind]
-                    after = seq[insert_ind:L-insert_len]
-                    new_seq = tf.concat([before, insertion, after], axis=0)
-                    return new_seq
-                
-                def insert_at_zero():
-                    after = seq[:L-insert_len]
-                    new_seq = tf.concat([insertion, after], axis=0)
-                    return new_seq
-                
-                new_seq = tf.cond(insert_ind > 0, insert_at_position, insert_at_zero)
-                result = tf.tensor_scatter_nd_update(result, [[i]], [new_seq])
-                return i + 1, result
+            # Create insertion mask for each sequence
+            positions = tf.range(L)[None, :]  # (1, L)
+            insert_starts_expanded = insert_starts[:, None]  # (N, 1)
             
-            _, result = tf.while_loop(cond, body, [0, result])
+            insert_mask = tf.logical_and(
+                positions >= insert_starts_expanded,
+                positions < insert_starts_expanded + insert_len
+            )  # (N, L)
+            
+            # Expand to full shape
+            insert_mask = insert_mask[:, :, None]  # (N, L, 1)
+            insert_mask = tf.tile(insert_mask, [1, 1, A])  # (N, L, A)
+            
+            # Apply mask
+            result = tf.where(insert_mask, insertion, x)
             return result
 
         return tf.cond(insert_len <= 0, lambda: x, do_insertion)
@@ -202,8 +191,7 @@ class RandomInsertion(AugmentBase):
 class RandomDeletion(AugmentBase):
     """Randomly deletes a contiguous stretch of nucleotides from sequences in a training 
     batch according to a random number between a user-defined delete_min and delete_max. 
-    The sequence length is maintained by padding with random DNA. A different deletion 
-    is applied to each sequence.
+    A different deletion is applied to each sequence.
 
     Parameters
     ----------
@@ -218,7 +206,7 @@ class RandomDeletion(AugmentBase):
     
     @tf.function
     def __call__(self, x):
-        """Randomly delete segments in a set of one-hot DNA sequences while maintaining length.
+        """Randomly delete segments in a set of one-hot DNA sequences.
 
         Parameters
         ----------
@@ -228,52 +216,42 @@ class RandomDeletion(AugmentBase):
         Returns
         -------
         tf.Tensor
-            Sequences with randomly deleted segments, padded with random DNA to maintain 
-            original sequence length.
+            Sequences with randomly deleted segments replaced with random DNA.
         """
         N, L, A = tf.shape(x)[0], tf.shape(x)[1], tf.shape(x)[2]
 
-        delete_len = tf.random.uniform([], self.delete_min,
-                                       tf.minimum(self.delete_max, L // 2) + 1,
-                                       dtype=tf.int32)
+        # Determine deletion length with proper bounds checking
+        max_delete = tf.minimum(self.delete_max, L // 2)
+        
+        # Ensure minval < maxval for tf.random.uniform
+        effective_min = tf.minimum(self.delete_min, max_delete)
+        effective_max = tf.maximum(effective_min, max_delete)
+        
+        delete_len = tf.random.uniform([], effective_min, effective_max + 1, dtype=tf.int32)
 
         def do_deletion():
-            # Generate random DNA padding for each sequence
-            new_idx = tf.random.uniform((N, delete_len), minval=0, maxval=A, dtype=tf.int32)
-            padding = tf.one_hot(new_idx, A, dtype=x.dtype)
-
-            # Generate random deletion positions for each sequence
-            delete_inds = tf.random.uniform((N,), minval=0, maxval=L - delete_len + 1, dtype=tf.int32)
-
-            # Create output tensor
-            result = tf.zeros_like(x)
+            # Generate different deletion positions for each sequence
+            delete_starts = tf.random.uniform((N,), 0, L - delete_len + 1, dtype=tf.int32)
             
-            # Use tf.while_loop to process each sequence
-            def cond(i, result):
-                return i < N
+            # Generate random replacement DNA for all sequences
+            new_idx = tf.random.uniform((N, L), minval=0, maxval=A, dtype=tf.int32)
+            replacement = tf.one_hot(new_idx, A, dtype=x.dtype)
             
-            def body(i, result):
-                seq = x[i]
-                pad = padding[i]
-                delete_ind = delete_inds[i]
-                
-                # Use tf.cond to handle the slicing
-                def delete_at_position():
-                    before = seq[:delete_ind]
-                    after = seq[delete_ind + delete_len:]
-                    new_seq = tf.concat([before, after, pad], axis=0)
-                    return new_seq
-                
-                def delete_at_zero():
-                    after = seq[delete_len:]
-                    new_seq = tf.concat([after, pad], axis=0)
-                    return new_seq
-                
-                new_seq = tf.cond(delete_ind > 0, delete_at_position, delete_at_zero)
-                result = tf.tensor_scatter_nd_update(result, [[i]], [new_seq])
-                return i + 1, result
+            # Create deletion mask for each sequence
+            positions = tf.range(L)[None, :]  # (1, L)
+            delete_starts_expanded = delete_starts[:, None]  # (N, 1)
             
-            _, result = tf.while_loop(cond, body, [0, result])
+            delete_mask = tf.logical_and(
+                positions >= delete_starts_expanded,
+                positions < delete_starts_expanded + delete_len
+            )  # (N, L)
+            
+            # Expand to full shape
+            delete_mask = delete_mask[:, :, None]  # (N, L, 1)
+            delete_mask = tf.tile(delete_mask, [1, 1, A])  # (N, L, A)
+            
+            # Apply mask
+            result = tf.where(delete_mask, replacement, x)
             return result
 
         return tf.cond(delete_len <= 0, lambda: x, do_deletion)
@@ -362,7 +340,7 @@ class RandomNoise(AugmentBase):
 class RandomInsertionBatch(AugmentBase):
     """Randomly inserts a contiguous stretch of nucleotides into sequences in a training 
     batch according to a random number between a user-defined insert_min and insert_max. 
-    The sequence length is maintained by trimming the end of the sequence after insertion.
+    The sequence length is maintained by replacing part of the sequence.
     The same insertion is applied to all sequences in the batch.
 
     Parameters
@@ -389,30 +367,40 @@ class RandomInsertionBatch(AugmentBase):
         -------
         tf.Tensor
             Sequences with randomly inserted segments of random DNA. Original sequence 
-            length is maintained by trimming the end.
+            length is maintained by replacing existing sequence.
         """
         N, L, A = tf.shape(x)[0], tf.shape(x)[1], tf.shape(x)[2]
 
-        insert_len = tf.random.uniform([], self.insert_min,
-                                       tf.minimum(self.insert_max, L // 2) + 1,
-                                       dtype=tf.int32)
+        # Determine insertion length with proper bounds checking
+        max_insert = tf.minimum(self.insert_max, L // 2)
+        
+        # Ensure minval < maxval for tf.random.uniform
+        effective_min = tf.minimum(self.insert_min, max_insert)
+        effective_max = tf.maximum(effective_min, max_insert)
+        
+        insert_len = tf.random.uniform([], effective_min, effective_max + 1, dtype=tf.int32)
 
         def do_insertion():
-            # Generate random DNA insertion (same for all sequences)
-            new_idx = tf.random.uniform((insert_len,), minval=0, maxval=A, dtype=tf.int32)
-            insertion = tf.one_hot(new_idx, A, dtype=x.dtype)
-            insertion = tf.expand_dims(insertion, 0)  # (1, insert_len, A)
-            insertion = tf.tile(insertion, [N, 1, 1])  # (N, insert_len, A)
-
-            # Generate random insertion position (same for all sequences)
-            insert_ind = tf.random.uniform([], minval=0, maxval=L - insert_len + 1, dtype=tf.int32)
-
-            # Split all sequences at the same position
-            before = x[:, :insert_ind, :]  # (N, insert_ind, A)
-            after = x[:, insert_ind:L-insert_len, :]  # (N, L-insert_len-insert_ind, A)
+            # Choose insertion start position
+            insert_start = tf.random.uniform([], 0, L - insert_len + 1, dtype=tf.int32)
             
-            # Concatenate: before + insertion + after
-            result = tf.concat([before, insertion, after], axis=1)
+            # Generate random insertion DNA for all sequences
+            new_idx = tf.random.uniform((N, L), minval=0, maxval=A, dtype=tf.int32)
+            insertion = tf.one_hot(new_idx, A, dtype=x.dtype)
+            
+            # Create insertion mask - True where we should use insertion DNA
+            positions = tf.range(L)  # (L,)
+            insert_mask = tf.logical_and(
+                positions >= insert_start,
+                positions < insert_start + insert_len
+            )  # (L,)
+            
+            # Expand mask to full tensor shape
+            insert_mask = insert_mask[None, :, None]  # (1, L, 1)
+            insert_mask = tf.tile(insert_mask, [N, 1, A])  # (N, L, A)
+            
+            # Apply mask: use insertion where mask is True, original where False
+            result = tf.where(insert_mask, insertion, x)
             return result
 
         return tf.cond(insert_len <= 0, lambda: x, do_insertion)
@@ -424,6 +412,8 @@ class RandomDeletionBatch(AugmentBase):
     """Randomly deletes a contiguous stretch of nucleotides from sequences in a training 
     batch according to a random number between a user-defined delete_min and delete_max. 
     The same deletion is applied to all sequences in the batch.
+    
+    This version uses masking to avoid shape inference issues.
 
     Parameters
     ----------
@@ -448,31 +438,41 @@ class RandomDeletionBatch(AugmentBase):
         Returns
         -------
         tf.Tensor
-            Sequences with randomly deleted segments (padded to correct shape
-            with random DNA)
+            Sequences with randomly deleted segments replaced with random DNA.
+            Original shape is preserved.
         """
         N, L, A = tf.shape(x)[0], tf.shape(x)[1], tf.shape(x)[2]
 
-        delete_len = tf.random.uniform([], self.delete_min,
-                                       tf.minimum(self.delete_max, L // 2) + 1,
-                                       dtype=tf.int32)
+        # Determine deletion length with proper bounds checking
+        max_delete = tf.minimum(self.delete_max, L // 2)
+        
+        # Ensure minval < maxval for tf.random.uniform
+        effective_min = tf.minimum(self.delete_min, max_delete)
+        effective_max = tf.maximum(effective_min, max_delete)
+        
+        delete_len = tf.random.uniform([], effective_min, effective_max + 1, dtype=tf.int32)
 
         def do_deletion():
-            # Generate random DNA padding (same for all sequences)
-            new_idx = tf.random.uniform((delete_len,), minval=0, maxval=A, dtype=tf.int32)
-            padding = tf.one_hot(new_idx, A, dtype=x.dtype)
-            padding = tf.expand_dims(padding, 0)  # (1, delete_len, A)
-            padding = tf.tile(padding, [N, 1, 1])  # (N, delete_len, A)
-
-            # Generate random deletion position (same for all sequences)
-            delete_ind = tf.random.uniform([], minval=0, maxval=L - delete_len + 1, dtype=tf.int32)
-
-            # Split all sequences at the same position (skipping deleted region)
-            before = x[:, :delete_ind, :]  # (N, delete_ind, A)
-            after = x[:, delete_ind + delete_len:, :]  # (N, L-delete_ind-delete_len, A)
+            # Choose deletion start position
+            delete_start = tf.random.uniform([], 0, L - delete_len + 1, dtype=tf.int32)
             
-            # Concatenate: before + after + padding
-            result = tf.concat([before, after, padding], axis=1)
+            # Generate random replacement DNA for all sequences
+            new_idx = tf.random.uniform((N, L), minval=0, maxval=A, dtype=tf.int32)
+            replacement = tf.one_hot(new_idx, A, dtype=x.dtype)
+            
+            # Create deletion mask - True where we should use replacement DNA
+            positions = tf.range(L)  # (L,)
+            delete_mask = tf.logical_and(
+                positions >= delete_start,
+                positions < delete_start + delete_len
+            )  # (L,)
+            
+            # Expand mask to full tensor shape
+            delete_mask = delete_mask[None, :, None]  # (1, L, 1)
+            delete_mask = tf.tile(delete_mask, [N, 1, A])  # (N, L, A)
+            
+            # Apply mask: use replacement where mask is True, original where False
+            result = tf.where(delete_mask, replacement, x)
             return result
 
         return tf.cond(delete_len <= 0, lambda: x, do_deletion)
