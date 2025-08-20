@@ -34,18 +34,22 @@ augment_list = [
 ]
 
 # Create augmented datasets
-train_dataset = evoaug.EvoAugDataset.create_train_dataset(
+train_dataset = evoaug.EvoAugDataset.create_dataset(
     x_train, y_train, 
     augment_list=augment_list, 
     batch_size=32,
     max_augs_per_seq=1,
-    hard_aug=True
+    hard_aug=True,
+    apply_augmentations=True,  # Enable augmentations for training
+    shuffle=True  # Shuffle training data
 )
 
-val_dataset = evoaug.EvoAugDataset.create_val_dataset(
+val_dataset = evoaug.EvoAugDataset.create_dataset(
     x_valid, y_valid,
     augment_list=None,  # No augmentations for validation
-    batch_size=32
+    batch_size=32,
+    apply_augmentations=False,  # Disable augmentations for validation
+    shuffle=False  # Don't shuffle validation data
 )
 
 # Create your Keras model (standard approach)
@@ -101,11 +105,12 @@ history = model.fit(
 model.save_weights(os.path.join(output_dir, exp_name + "_aug.h5"))
 
 # Fine-tuning: Create dataset without augmentations
-finetune_train_dataset = evoaug.EvoAugDataset(
+finetune_train_dataset = evoaug.EvoAugDataset.create_dataset(
     x_train, y_train,
-    augment_list=[],  # No augmentations for fine-tuning
+    augment_list=None,  # No augmentations for fine-tuning
     batch_size=32,
-    apply_augmentations=False
+    apply_augmentations=False,
+    shuffle=True
 )
 
 # Update optimizer for fine-tuning

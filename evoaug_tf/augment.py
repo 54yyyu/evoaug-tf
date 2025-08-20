@@ -551,8 +551,3 @@ class RandomRCBatch(AugmentBase):
         complement = tf.gather(x, [3, 2, 1, 0], axis=2)
         rc = tf.reverse(complement, axis=[1])
         return tf.cond(apply, lambda: rc, lambda: x)
-
-
-
-
-

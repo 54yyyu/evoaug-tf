@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="evoaug-tf",
-    version="1.0.4",
+    version="2.0.0",
     packages=find_packages(),
     description="A Python package providing dataloader-based evolution-inspired data augmentations for TensorFlow genomics models.",
     long_description="EvoAug-TF provides a tf.data.Dataset-based approach for applying evolution-inspired augmentations to genomic sequence data, making it easy to integrate with any TensorFlow/Keras model and training pipeline.",

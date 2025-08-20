@@ -122,16 +122,28 @@ class EvoAugDataset:
         return self._dataset
 
     @classmethod
-    def create_train_dataset(cls, x_train, y_train, augment_list, batch_size=32, **kwargs):
-        """Create a training dataset with augmentations enabled."""
-        return cls(x_train, y_train, augment_list=augment_list, batch_size=batch_size, 
-                  apply_augmentations=True, shuffle=True, **kwargs)
-
-    @classmethod 
-    def create_val_dataset(cls, x_val, y_val, augment_list=None, batch_size=32, **kwargs):
-        """Create a validation dataset without augmentations."""
-        return cls(x_val, y_val, augment_list=augment_list or [], batch_size=batch_size,
-                  apply_augmentations=False, shuffle=False, **kwargs)
+    def create_dataset(cls, x, y=None, augment_list=None, batch_size=32, **kwargs):
+        """Create a dataset with optional augmentations.
+        
+        Parameters
+        ----------
+        x : tf.Tensor or numpy.ndarray
+            Input sequences with shape (N, L, A).
+        y : tf.Tensor or numpy.ndarray, optional
+            Target labels. If None, only input data will be returned.
+        augment_list : list, optional
+            List of data augmentations. Default is None (no augmentations).
+        batch_size : int
+            Batch size for the dataset, default is 32.
+        **kwargs
+            Additional keyword arguments passed to EvoAugDataset constructor.
+            
+        Returns
+        -------
+        EvoAugDataset
+            Dataset instance ready for training or evaluation.
+        """
+        return cls(x, y, augment_list=augment_list or [], batch_size=batch_size, **kwargs)
 
 
 #------------------------------------------------------------------------
