@@ -62,19 +62,17 @@ class RandomTranslocation(AugmentBase):
         """
         N = tf.shape(x)[0]
 
-        shifts = tf.random.uniform(
-            shape=[N],
-            minval=self.shift_min,
-            maxval=self.shift_max + 1,
-            dtype=tf.int32,
-        )
-        # randomize direction
-        signs = tf.where(tf.random.uniform([N]) < 0.5, -1, 1)
-        shifts = shifts * signs
+        # determine size of shifts for each sequence
+        shifts = tf.random.uniform(shape=[N,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)
 
-        return tf.map_fn(lambda args: tf.roll(args[0], shift=args[1], axis=1),
-                         (x, shifts),
-                         fn_output_signature=tf.TensorSpec(shape=(None, None), dtype=x.dtype))
+        # apply random shift to each sequence
+        x_rolled = tf.TensorArray(dtype=x.dtype, size=N, element_shape=x[0].shape)
+        body = lambda i, x_rolled: (i + 1, x_rolled.write(i, tf.roll(x[i], shift=shifts[i], axis=0)))
+        cond = lambda i, x_rolled: i < tf.shape(shifts)[0]
+        _, x_rolled = tf.while_loop(cond, body, [0, x_rolled])
+        x_new = x_rolled.stack()
+
+        return x_new
 
 
 class RandomMutation(AugmentBase):
@@ -105,19 +103,32 @@ class RandomMutation(AugmentBase):
         """
         N = tf.shape(x)[0]
         L = tf.shape(x)[1]
-        A = tf.shape(x)[2]
+        A = tf.cast(tf.shape(x)[2], dtype = tf.float32)
 
-        # mask of sites to mutate
-        mask = tf.random.uniform((N, L)) < self.mutate_frac
+        # determine the number of mutations per sequence
+        num_mutations = tf.cast(tf.round(tf.cast(self.mutate_frac / 0.75, dtype=tf.float32) * tf.cast(L, dtype=tf.float32)), dtype=tf.int32)
 
-        # sample new nucleotides uniformly
-        new_idx = tf.random.uniform((N, L), minval=0, maxval=A, dtype=tf.int32)
-        new_onehot = tf.one_hot(new_idx, A, dtype=x.dtype)
+        # randomly determine the indices to apply mutations
+        mutation_inds = tf.slice(tf.argsort(tf.random.uniform(shape=(N, L)), axis=1), [0,0], [N,num_mutations])
 
-        # replace where mask is True
-        mask = tf.cast(mask[:, :, None], x.dtype)
-        x_mut = (1 - mask) * x + mask * new_onehot
-        return x_mut
+        a = tf.eye(A)
+        p = tf.ones((A,)) / A
+        mutations = tf.transpose(tf.gather(a, tf.random.categorical(tf.math.log(tf.repeat([p], repeats=num_mutations, axis=0)), N)), perm=[1,0,2])
+
+        x_aug = tf.TensorArray(x.dtype, size=N)
+
+        i = tf.constant(0)
+
+        while_condition = lambda i, _: tf.less(i, N)
+
+        body = lambda i, x_aug: (
+            i + 1, 
+            x_aug.write(i, tf.tensor_scatter_nd_update(x[i], tf.expand_dims(mutation_inds[i], axis=1), mutations[i]))
+        )
+
+        _, x_aug = tf.while_loop(while_condition, body, loop_vars=[i, x_aug])
+        x_rolled = x_aug.stack()
+        return x_rolled
 
 
 class RandomInsertion(AugmentBase):
@@ -314,7 +325,6 @@ class RandomNoise(AugmentBase):
         self.noise_mean = noise_mean
         self.noise_std = noise_std
     
-    @tf.function
     def __call__(self, x):
         """Randomly adds Gaussian noise to a set of one-hot DNA sequences.
 
@@ -328,7 +338,7 @@ class RandomNoise(AugmentBase):
         tf.Tensor
             Sequences with random noise. 
         """
-        return x + tf.random.normal(tf.shape(x), mean=self.noise_mean, stddev=self.noise_std)
+        return x + tf.random.normal(shape=tf.shape(x), mean=self.noise_mean, stddev=self.noise_std)
 
 
 
@@ -509,11 +519,12 @@ class RandomTranslocationBatch(AugmentBase):
         tf.Tensor
             Sequences with random translocations.
         """
-        shift = tf.random.uniform([], minval=self.shift_min,
-                                  maxval=self.shift_max + 1, dtype=tf.int32)
-        if tf.random.uniform([]) < 0.5:
-            shift = -shift
-        return tf.roll(x, shift=shift, axis=1)
+        N = tf.shape(x)[0]
+
+        # determine size of shifts for each sequence
+        shift = tf.random.uniform(shape=[1,], minval=-1*self.shift_max, maxval=self.shift_max, dtype=tf.int32)[0]
+        x_aug = tf.roll(x, shift=shift, axis=1)
+        return x_aug
 
 
 
@@ -533,7 +544,6 @@ class RandomRCBatch(AugmentBase):
         """
         self.rc_prob = tf.constant(rc_prob)
 
-    @tf.function
     def __call__(self, x):
         """ Randomly transforms sequences in a batch with a reverse-complement transformation. 
 
@@ -547,7 +557,8 @@ class RandomRCBatch(AugmentBase):
         tf.tensor
             Sequences with random reverse-complements applied.
         """
-        apply = tf.random.uniform([]) < self.rc_prob
-        complement = tf.gather(x, [3, 2, 1, 0], axis=2)
-        rc = tf.reverse(complement, axis=[1])
-        return tf.cond(apply, lambda: rc, lambda: x)
+        x_rc = tf.gather(x, [3, 2, 1, 0], axis=2)
+        x_rc = tf.reverse(x_rc, axis=[1])
+        apply = tf.random.uniform(shape=[]) > (1 - self.rc_prob)
+        x_new = tf.cond(apply, lambda: x_rc, lambda: x)
+        return x_new
